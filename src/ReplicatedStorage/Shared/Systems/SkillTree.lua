@@ -126,9 +126,9 @@ function SkillTree.GetTreeState(profile)
         nodes[node.Id] = nodeState
         local branch = branchState[node.Category]
         if branch then
-            branch.TotalCount += 1
+            branch.TotalCount = branch.TotalCount + 1
             if nodeState.Unlocked then
-                branch.UnlockedCount += 1
+                branch.UnlockedCount = branch.UnlockedCount + 1
             end
         end
     end

@@ -13,6 +13,7 @@ local TableUtil = require(Util:WaitForChild("TableUtil"))
 local function buildDefaultProfile(userId: number)
     return {
         Meta = {
+            -- v2 adds SkillTree, Unlocks, Modifiers, and expanded Stats fields.
             SchemaVersion = 2,
             UserId = userId,
             SaveMode = "Normal",

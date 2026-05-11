@@ -1,5 +1,6 @@
 --!strict
 local RewardApplier = {}
+local HttpService = game:GetService("HttpService")
 
 local function getMultiplier(baseValue)
     return math.max(baseValue or 0, 0)
@@ -46,7 +47,14 @@ function RewardApplier.Apply(profile, reward)
             profile.Unlocks.Zones[reward.ZoneId] = true
         end
     else
-        warn(string.format("[RewardApplier] Unknown reward type '%s' for reward payload %s.", tostring(reward.Type), game:GetService("HttpService"):JSONEncode(reward)))
+        local serialized = "<unavailable>"
+        local success, encoded = pcall(function()
+            return HttpService:JSONEncode(reward)
+        end)
+        if success then
+            serialized = encoded
+        end
+        warn(string.format("[RewardApplier] Unknown reward type '%s' for reward payload %s.", tostring(reward.Type), serialized))
     end
 end
 
