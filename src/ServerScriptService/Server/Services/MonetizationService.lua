@@ -30,8 +30,8 @@ function MonetizationService:Init(dataService)
 
     self._started = true
     self._dataService = dataService
-    self._pushState = function() end
-    self._notify = function() end
+    self._pushState = function(_player: Player) end :: (Player) -> ()
+    self._notify = function(_player: Player, _message: string, _kind: string?) end :: (Player, string, string?) -> ()
 
     MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, gamePassId, wasPurchased)
         if not wasPurchased then

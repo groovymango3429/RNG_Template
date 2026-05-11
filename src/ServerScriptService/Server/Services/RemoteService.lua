@@ -5,7 +5,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local RemoteDefinitions = require(Shared:WaitForChild("RemoteDefinitions"))
 
 local RemoteService = {
-    _instances = {},
+    _instances = {} :: {[string]: any},
 }
 
 function RemoteService:Init()

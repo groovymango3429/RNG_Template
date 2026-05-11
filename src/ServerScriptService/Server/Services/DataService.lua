@@ -9,13 +9,7 @@ local Util = Shared:WaitForChild("Util")
 local DataConfig = require(Config:WaitForChild("DataConfig"))
 local TableUtil = require(Util:WaitForChild("TableUtil"))
 
-local DataService = {
-    _profiles = {},
-    _dirty = {},
-    _started = false,
-}
-
-local function buildDefaultProfile(userId)
+local function buildDefaultProfile(userId: number)
     return {
         Meta = {
             SchemaVersion = 1,
@@ -38,8 +32,8 @@ local function buildDefaultProfile(userId)
         Settings = {
             AutoRoll = false,
         },
-        Inventory = {},
-        Index = {},
+        Inventory = {} :: {[string]: number},
+        Index = {} :: {[string]: boolean},
         Rewards = {
             Daily = {
                 LastClaimDay = -1,
@@ -47,7 +41,7 @@ local function buildDefaultProfile(userId)
             },
             Playtime = {
                 AccumulatedSeconds = 0,
-                ClaimedSlots = {},
+                ClaimedSlots = {} :: {[number]: boolean},
             },
         },
         Boosts = {
@@ -57,11 +51,19 @@ local function buildDefaultProfile(userId)
             },
         },
         Purchases = {
-            Gamepasses = {},
-            Products = {},
+            Gamepasses = {} :: {[string]: boolean},
+            Products = {} :: {[string]: number},
         },
     }
 end
+
+type Profile = typeof(buildDefaultProfile(0))
+
+local DataService = {
+    _profiles = {} :: {[Player]: Profile},
+    _dirty = {} :: {[Player]: boolean},
+    _started = false,
+}
 
 function DataService:_withRetries(callback, label)
     local lastError = "Unknown error"

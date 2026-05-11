@@ -11,7 +11,7 @@ local RollConfig = require(Config:WaitForChild("RollConfig"))
 local WeightedRandom = require(Util:WaitForChild("WeightedRandom"))
 
 local RNGService = {
-    _lastRollTimestamps = {},
+    _lastRollTimestamps = {} :: {[Player]: number},
 }
 
 local function sortByRarityThenName(a, b)
