@@ -43,7 +43,7 @@ function FormatUtil.Reward(reward)
     elseif reward.Type == "LuckBonus" then
         return string.format("+%.2f Luck", reward.Amount or 0)
     elseif reward.Type == "AutoRollInterval" then
-        return string.format("-%0.2fs Auto Roll Interval", reward.Amount or 0)
+        return string.format("-%.2fs Auto Roll Interval", reward.Amount or 0)
     elseif reward.Type == "CombatPower" then
         return string.format("+%s Combat Power", FormatUtil.Number(reward.Amount or 0))
     elseif reward.Type == "UnlockZone" then

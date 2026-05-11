@@ -378,7 +378,7 @@ function UIController:_updateRebirth(snapshot)
     local fill = SafeWait.FindPath(rebirthPanel, { "Content", "Progress", "Bar", "Fill" })
 
     setText(currentLabel, string.format("Rebirths: %s", FormatUtil.Number(rebirthState.CurrentRebirths or 0)))
-    setText(nextLabel, string.format("Next Bonus: %s Gems | +%s SP", FormatUtil.Number(rebirthState.NextBonusGems or 0), FormatUtil.Number(rebirthState.NextSkillPoints or 0)))
+    setText(nextLabel, string.format("Next Bonus: %s Gems | +%s Skill Points", FormatUtil.Number(rebirthState.NextBonusGems or 0), FormatUtil.Number(rebirthState.NextSkillPoints or 0)))
     setText(progressLabel, string.format("%s / %s rolls", FormatUtil.Number(rebirthState.CurrentRolls or 0), FormatUtil.Number(rebirthState.NextRequiredRolls or 0)))
     setFill(fill, rebirthState.Progress or 0)
 end
