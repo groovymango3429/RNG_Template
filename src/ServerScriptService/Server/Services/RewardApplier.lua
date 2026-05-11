@@ -46,7 +46,7 @@ function RewardApplier.Apply(profile, reward)
             profile.Unlocks.Zones[reward.ZoneId] = true
         end
     else
-        warn(string.format("[RewardApplier] Unknown reward type '%s'.", tostring(reward.Type)))
+        warn(string.format("[RewardApplier] Unknown reward type '%s' for reward payload %s.", tostring(reward.Type), game:GetService("HttpService"):JSONEncode(reward)))
     end
 end
 

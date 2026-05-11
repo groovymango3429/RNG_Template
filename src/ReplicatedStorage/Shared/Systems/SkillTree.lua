@@ -75,7 +75,7 @@ function SkillTree.CanPurchase(profile, node)
     local cost = node.Cost or { Currency = "SkillPoints", Amount = 0 }
     local balance = SkillTree.GetCurrencyAmount(profile, cost.Currency)
     if balance < (cost.Amount or 0) then
-        return false, string.format("Need %d %s", cost.Amount or 0, cost.Currency or "Currency")
+        return false, string.format("Need %d %s", cost.Amount or 0, cost.Currency or "resources")
     end
 
     return true

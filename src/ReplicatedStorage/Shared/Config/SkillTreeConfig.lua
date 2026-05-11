@@ -75,6 +75,7 @@ return {
             },
             ParentDependencies = { "auto_efficiency_1" },
             Rewards = {
+                -- Must match a ProgressionConfig.DiscoverZones[].Id value.
                 { Type = "UnlockZone", ZoneId = "Diamond" },
             },
             Gui = {
