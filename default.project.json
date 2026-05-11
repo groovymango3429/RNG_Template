@@ -1,0 +1,36 @@
+{
+  "name": "RNG_Template",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$path": "src/ReplicatedStorage"
+    },
+    "ServerScriptService": {
+      "$path": "src/ServerScriptService"
+    },
+    "StarterPlayer": {
+      "$path": "src/StarterPlayer"
+    },
+    "StarterGui": {
+      "$path": "src/StarterGui"
+    },
+    "ServerStorage": {
+      "$path": "src/ServerStorage"
+    },
+    "Workspace": {
+      "$path": "src/Workspace"
+    },
+    "Lighting": {
+      "$path": "src/Lighting"
+    },
+    "SoundService": {
+      "$path": "src/SoundService"
+    },
+    "TextChatService": {
+      "$path": "src/TextChatService"
+    },
+    "Teams": {
+      "$path": "src/Teams"
+    }
+  }
+}
