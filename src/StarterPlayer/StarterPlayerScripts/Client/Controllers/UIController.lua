@@ -8,6 +8,7 @@ local Util = Shared:WaitForChild("Util")
 
 local AnimationConfig = require(Config:WaitForChild("AnimationConfig"))
 local DeveloperProducts = require(Config:WaitForChild("DeveloperProducts"))
+local SkillTreeConfig = require(Config:WaitForChild("SkillTreeConfig"))
 local FormatUtil = require(Util:WaitForChild("FormatUtil"))
 local SafeWait = require(Util:WaitForChild("SafeWait"))
 local Trove = require(Util:WaitForChild("Trove"))
@@ -67,6 +68,8 @@ function UIController.new(remotes, notifier)
     self._ui = SafeWait.WaitForChild(self._playerGui, UIConfig.RootGui, 15)
     self._panels = {}
     self._rollTable = {}
+    self._skillButtons = {}
+    self._selectedSkillNodeId = nil
 
     if self._ui then
         for _, panelName in ipairs(UIConfig.Panels) do
@@ -76,6 +79,7 @@ function UIController.new(remotes, notifier)
         self:_bindActions()
         self:_bindCloseButtons()
         self:_bindRewardButtons()
+        self:_bindSkillTreeButtons()
     end
 
     return self
@@ -219,6 +223,25 @@ function UIController:_bindRewardButtons()
     end
 end
 
+function UIController:_bindSkillTreeButtons()
+    for _, node in ipairs(SkillTreeConfig.Nodes) do
+        local buttonPath = node.Gui and node.Gui.ButtonPath
+        if buttonPath then
+            local button = SafeWait.FindPath(self._ui, buttonPath, true)
+            if button and button:IsA("GuiButton") then
+                self._skillButtons[node.Id] = button
+                self._trove:Connect(button.Activated, function()
+                    self._selectedSkillNodeId = node.Id
+                    local result = self:_invoke("PurchaseSkillTreeNode", node.Id)
+                    if result and not result.Success and result.Message then
+                        self._notifier:Show({ Kind = "Warning", Message = result.Message })
+                    end
+                end)
+            end
+        end
+    end
+end
+
 function UIController:RequestRoll()
     if self._rollBusy then
         return
@@ -299,14 +322,14 @@ function UIController:_updateDiscover(discoverState)
             })
             local fill = SafeWait.FindPath(zoneFrame, { "Bar", "Fill" })
             setFill(fill, zoneState.Progress)
-                if label then
-                    if zoneState.Unlocked then
-                        label.Text = string.format("%s Unlocked", zoneName)
-                    else
-                        label.Text = string.format("%s / %s rolls", FormatUtil.Number(self._snapshot.Stats.Rolls or 0), FormatUtil.Number(zoneState.RequiredRolls))
-                    end
+            if label then
+                if zoneState.Unlocked then
+                    label.Text = string.format("%s Unlocked", zoneName)
+                else
+                    label.Text = string.format("%s / %s rolls", FormatUtil.Number(self._snapshot.Stats.Rolls or 0), FormatUtil.Number(zoneState.RequiredRolls))
                 end
             end
+        end
     end
 end
 
@@ -355,7 +378,7 @@ function UIController:_updateRebirth(snapshot)
     local fill = SafeWait.FindPath(rebirthPanel, { "Content", "Progress", "Bar", "Fill" })
 
     setText(currentLabel, string.format("Rebirths: %s", FormatUtil.Number(rebirthState.CurrentRebirths or 0)))
-    setText(nextLabel, string.format("Next Bonus: %s Gems", FormatUtil.Number(rebirthState.NextBonusGems or 0)))
+    setText(nextLabel, string.format("Next Bonus: %s Gems | +%s SP", FormatUtil.Number(rebirthState.NextBonusGems or 0), FormatUtil.Number(rebirthState.NextSkillPoints or 0)))
     setText(progressLabel, string.format("%s / %s rolls", FormatUtil.Number(rebirthState.CurrentRolls or 0), FormatUtil.Number(rebirthState.NextRequiredRolls or 0)))
     setFill(fill, rebirthState.Progress or 0)
 end
@@ -386,19 +409,102 @@ function UIController:_updateRewardPanel(snapshot)
     end
 end
 
+function UIController:_updateSkillTree(snapshot)
+    local tree = snapshot.SkillTree
+    if not tree then
+        return
+    end
+
+    local selectedNodeState = nil
+    local selectedNodeConfig = nil
+
+    for _, nodeConfig in ipairs(SkillTreeConfig.Nodes) do
+        local nodeState = tree.Nodes[nodeConfig.Id]
+        local button = self._skillButtons[nodeConfig.Id]
+        if button and nodeState then
+            button.Visible = nodeState.Visible
+            button.AutoButtonColor = nodeState.CanPurchase
+            button.Active = nodeState.Unlocked or nodeState.CanPurchase
+
+            local title = findLabel(button, {
+                { "Label01", "Main" },
+                { "Title", "Main" },
+            })
+            local status = findLabel(button, {
+                { "Label02", "Main" },
+                { "Status", "Main" },
+            })
+            setText(title, nodeState.Name)
+            if nodeState.Unlocked then
+                setText(status, "Unlocked")
+            elseif nodeState.CanPurchase then
+                setText(status, "Available")
+            else
+                setText(status, nodeState.LockedReason)
+            end
+        end
+
+        if self._selectedSkillNodeId == nodeConfig.Id then
+            selectedNodeState = nodeState
+            selectedNodeConfig = nodeConfig
+        end
+    end
+
+    if not selectedNodeState then
+        for _, nodeConfig in ipairs(SkillTreeConfig.Nodes) do
+            local nodeState = tree.Nodes[nodeConfig.Id]
+            if nodeState and nodeState.Visible then
+                self._selectedSkillNodeId = nodeConfig.Id
+                selectedNodeState = nodeState
+                selectedNodeConfig = nodeConfig
+                break
+            end
+        end
+    end
+
+    if selectedNodeState and selectedNodeConfig then
+        local detailGui = SkillTreeConfig.DetailGui or {}
+        local gui = selectedNodeConfig.Gui or {}
+        local namePath = gui.NamePath or detailGui.NamePath
+        local descriptionPath = gui.DescriptionPath or detailGui.DescriptionPath
+        local costPath = gui.CostPath or detailGui.CostPath
+        local statusPath = gui.StatusPath or detailGui.StatusPath
+
+        local nameLabel = namePath and SafeWait.FindPath(self._ui, namePath, true)
+        local descriptionLabel = descriptionPath and SafeWait.FindPath(self._ui, descriptionPath, true)
+        local costLabel = costPath and SafeWait.FindPath(self._ui, costPath, true)
+        local statusLabel = statusPath and SafeWait.FindPath(self._ui, statusPath, true)
+
+        setText(nameLabel, selectedNodeState.Name)
+        setText(descriptionLabel, selectedNodeState.Description)
+        if selectedNodeState.Cost then
+            setText(costLabel, string.format("Cost: %s %s", FormatUtil.Number(selectedNodeState.Cost.Amount or 0), selectedNodeState.Cost.Currency or ""))
+        end
+
+        if selectedNodeState.Unlocked then
+            setText(statusLabel, "Unlocked")
+        elseif selectedNodeState.CanPurchase then
+            setText(statusLabel, "Click node to unlock")
+        else
+            setText(statusLabel, selectedNodeState.LockedReason)
+        end
+    end
+end
+
 function UIController:_updateAutoRollState(snapshot)
     if self._autoRollThread then
         task.cancel(self._autoRollThread)
         self._autoRollThread = nil
     end
 
+    local interval = snapshot.Stats and snapshot.Stats.AutoRollInterval or 1.5
     if snapshot.Stats and snapshot.Stats.AutoRoll then
         self._autoRollThread = task.spawn(function()
             while self._snapshot and self._snapshot.Stats and self._snapshot.Stats.AutoRoll do
                 if not self._rollBusy then
                     self:RequestRoll()
                 end
-                task.wait(1.5)
+                task.wait(interval)
             end
         end)
     end
@@ -417,6 +523,7 @@ function UIController:ApplySnapshot(snapshot)
     self:_updateIndex(snapshot)
     self:_updateRebirth(snapshot)
     self:_updateRewardPanel(snapshot)
+    self:_updateSkillTree(snapshot)
     self:_updateAutoRollState(snapshot)
 end
 

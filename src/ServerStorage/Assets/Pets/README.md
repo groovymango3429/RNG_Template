@@ -1,3 +1,3 @@
 # Pets
 
-Optional pet models or future follower assets can live here.
+Place pet/follower models here for pet-style reskins. Keep model names stable and map them through config tables.

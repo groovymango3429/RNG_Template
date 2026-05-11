@@ -5,6 +5,7 @@ local Config = Shared:WaitForChild("Config")
 local Util = Shared:WaitForChild("Util")
 
 local DataConfig = require(Config:WaitForChild("DataConfig"))
+local EconomyConfig = require(Config:WaitForChild("EconomyConfig"))
 local ProgressionConfig = require(Config:WaitForChild("ProgressionConfig"))
 local Rarities = require(Config:WaitForChild("Rarities"))
 local RollConfig = require(Config:WaitForChild("RollConfig"))
@@ -35,6 +36,16 @@ function RNGService:GetClientRollTable()
     return items
 end
 
+function RNGService:GetAutoRollInterval(player)
+    local profile = self._dataService:GetProfile(player)
+    if not profile then
+        return EconomyConfig.Automation.BaseAutoRollInterval
+    end
+
+    local reduction = profile.Modifiers.AutoRollIntervalReduction or 0
+    return math.max(EconomyConfig.Automation.MinimumAutoRollInterval, EconomyConfig.Automation.BaseAutoRollInterval - reduction)
+end
+
 function RNGService:GetLuckMultiplier(player)
     local profile = self._dataService:GetProfile(player)
     if not profile then
@@ -45,8 +56,9 @@ function RNGService:GetLuckMultiplier(player)
     local activeBoost = (boost.ExpiresAt or 0) > os.time() and (boost.Amount or 0) or 0
     local rebirthBonus = (profile.Stats.Rebirths or 0) * ProgressionConfig.RebirthLuckPerLevel
     local monetizationBonus = self._monetizationService:GetLuckModifier(player)
+    local skillTreeBonus = profile.Modifiers.LuckBonus or 0
 
-    return ProgressionConfig.BaseLuckMultiplier + rebirthBonus + monetizationBonus + activeBoost
+    return ProgressionConfig.BaseLuckMultiplier + rebirthBonus + monetizationBonus + activeBoost + skillTreeBonus
 end
 
 function RNGService:GetDiscoverState(player)
@@ -57,14 +69,18 @@ function RNGService:GetDiscoverState(player)
 
     local result = {}
     for _, zone in ipairs(ProgressionConfig.DiscoverZones) do
-        local unlocked = (profile.Stats.Rolls or 0) >= zone.RequiredRolls and (profile.Stats.Rebirths or 0) >= zone.RequiredRebirths
+        local unlockedByProgress = (profile.Stats.Rolls or 0) >= zone.RequiredRolls and (profile.Stats.Rebirths or 0) >= zone.RequiredRebirths
+        local unlockedBySkillTree = profile.Unlocks.Zones[zone.Id] == true
+        local unlocked = unlockedByProgress or unlockedBySkillTree
         local rollsProgress = zone.RequiredRolls == 0 and 1 or math.clamp((profile.Stats.Rolls or 0) / zone.RequiredRolls, 0, 1)
         local rebirthProgress = zone.RequiredRebirths == 0 and 1 or math.clamp((profile.Stats.Rebirths or 0) / zone.RequiredRebirths, 0, 1)
+
         result[zone.Id] = {
             Unlocked = unlocked,
+            UnlockedBy = unlockedBySkillTree and "SkillTree" or (unlockedByProgress and "Progression" or "Locked"),
             RequiredRolls = zone.RequiredRolls,
             RequiredRebirths = zone.RequiredRebirths,
-            Progress = math.min(rollsProgress, rebirthProgress),
+            Progress = unlocked and 1 or math.min(rollsProgress, rebirthProgress),
         }
     end
     return result
@@ -112,8 +128,11 @@ function RNGService:Roll(player)
 
     self._lastRollTimestamps[player] = now
     self._dataService:UpdateProfile(player, function(activeProfile)
+        local coinScale = EconomyConfig.RewardScaling.BaseCoinMultiplier + (activeProfile.Modifiers.CoinMultiplier or 0)
+        local rewardCoins = math.floor((chosenItem.RewardCoins or 0) * math.max(coinScale, 0))
+
         activeProfile.Stats.Rolls = (activeProfile.Stats.Rolls or 0) + 1
-        activeProfile.Stats.Coins = (activeProfile.Stats.Coins or 0) + (chosenItem.RewardCoins or 0)
+        activeProfile.Stats.Coins = (activeProfile.Stats.Coins or 0) + rewardCoins
         activeProfile.Inventory[chosenItem.Id] = (activeProfile.Inventory[chosenItem.Id] or 0) + 1
         activeProfile.Index[chosenItem.Id] = true
     end)

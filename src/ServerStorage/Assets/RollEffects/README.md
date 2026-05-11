@@ -1,3 +1,3 @@
 # RollEffects
 
-Store particle emitters, beams, sounds, and other non-UI roll feedback assets here.
+Store particle emitters, beams, and reusable effect instances for roll/result feedback.

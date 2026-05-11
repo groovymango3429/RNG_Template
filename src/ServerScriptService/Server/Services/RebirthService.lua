@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
 
+local EconomyConfig = require(Config:WaitForChild("EconomyConfig"))
 local ProgressionConfig = require(Config:WaitForChild("ProgressionConfig"))
 
 local RebirthService = {}
@@ -27,6 +28,7 @@ function RebirthService:GetState(player)
         CurrentRolls = currentRolls,
         NextRequiredRolls = requiredRolls,
         NextBonusGems = nextStage and nextStage.BonusGems or 0,
+        NextSkillPoints = EconomyConfig.Rebirth.SkillPointsPerRebirth,
         Progress = requiredRolls > 0 and math.clamp(currentRolls / requiredRolls, 0, 1) or 1,
         AtMaxStage = rebirths >= #ProgressionConfig.RebirthStages,
     }
@@ -44,8 +46,18 @@ function RebirthService:TryRebirth(player, skipRequirement)
 
     self._dataService:UpdateProfile(player, function(profile)
         profile.Stats.Rebirths = (profile.Stats.Rebirths or 0) + 1
-        profile.Stats.Rolls = 0
-        profile.Stats.Coins = 0
+        profile.Stats.SkillPoints = (profile.Stats.SkillPoints or 0) + EconomyConfig.Rebirth.SkillPointsPerRebirth
+
+        if EconomyConfig.Rebirth.ResetRolls then
+            profile.Stats.Rolls = 0
+        end
+        if EconomyConfig.Rebirth.ResetCoins then
+            profile.Stats.Coins = 0
+        end
+        if EconomyConfig.Rebirth.ResetCombatPower then
+            profile.Stats.CombatPower = EconomyConfig.StartingStats.CombatPower
+        end
+
         profile.Stats.Gems = (profile.Stats.Gems or 0) + state.NextBonusGems
     end)
 

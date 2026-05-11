@@ -5,25 +5,29 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
 
-local DeveloperProducts = require(Config:WaitForChild("DeveloperProducts"))
 local UIConfig = require(Config:WaitForChild("UIConfig"))
 
 local ServerFolder = script.Parent:WaitForChild("Server")
 local Services = ServerFolder:WaitForChild("Services")
 
+local AssetService = require(Services:WaitForChild("AssetService"))
 local DataService = require(Services:WaitForChild("DataService"))
 local MonetizationService = require(Services:WaitForChild("MonetizationService"))
 local RNGService = require(Services:WaitForChild("RNGService"))
 local RebirthService = require(Services:WaitForChild("RebirthService"))
 local RemoteService = require(Services:WaitForChild("RemoteService"))
+local RewardApplier = require(Services:WaitForChild("RewardApplier"))
 local RewardService = require(Services:WaitForChild("RewardService"))
+local SkillTreeService = require(Services:WaitForChild("SkillTreeService"))
 
 RemoteService:Init()
 DataService:Init()
+AssetService:Init()
 RewardService:Init(DataService)
 MonetizationService:Init(DataService)
 RebirthService:Init(DataService)
 RNGService:Init(DataService, MonetizationService)
+SkillTreeService:Init(DataService, RewardApplier)
 
 local function notify(player, message, kind)
     RemoteService:Get("Notification"):FireClient(player, {
@@ -47,8 +51,11 @@ local function buildSnapshot(player)
             Gems = profile.Stats.Gems,
             Rolls = profile.Stats.Rolls,
             Rebirths = profile.Stats.Rebirths,
+            SkillPoints = profile.Stats.SkillPoints,
+            CombatPower = profile.Stats.CombatPower,
             LuckMultiplier = RNGService:GetLuckMultiplier(player),
             AutoRoll = profile.Settings.AutoRoll,
+            AutoRollInterval = RNGService:GetAutoRollInterval(player),
         },
         Inventory = profile.Inventory,
         Index = profile.Index,
@@ -60,10 +67,14 @@ local function buildSnapshot(player)
             Discover = RNGService:GetDiscoverState(player),
             Rebirth = RebirthService:GetState(player),
         },
+        SkillTree = SkillTreeService:GetState(player),
         Monetization = {
             Gamepasses = MonetizationService:GetOwnedGamepasses(player),
         },
         RollTable = RNGService:GetClientRollTable(),
+        UI = {
+            Root = UIConfig.RootGui,
+        },
     }
 end
 
@@ -179,6 +190,17 @@ RemoteService:Get("RequestRebirth").OnServerInvoke = function(player)
     pushState(player)
     notify(player, "Rebirth complete.", "Success")
     return { Success = true, State = state }
+end
+
+RemoteService:Get("PurchaseSkillTreeNode").OnServerInvoke = function(player, nodeId)
+    local state, message = SkillTreeService:PurchaseNode(player, nodeId)
+    if not state then
+        return { Success = false, Message = message }
+    end
+
+    pushState(player)
+    notify(player, "Skill tree node unlocked.", "Success")
+    return { Success = true, SkillTree = state }
 end
 
 RemoteService:Get("PromptGamepassPurchase").OnServerInvoke = function(player, key)

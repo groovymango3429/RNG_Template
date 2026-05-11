@@ -1,136 +1,243 @@
-# Roblox RNG Template
+# Roblox Generic Progression Template (Rojo)
 
-A Rojo-ready Roblox RNG template built around modular Luau services, reliable profile saving, existing Studio UI, and easy configuration.
+A reskinnable Roblox template built on modular client/server/shared systems for collecting, upgrading, fighting/automation loops, rebirth progression, and monetization hooks.
 
-## Quick start
+This template **extends the current RNG system** (rolls, inventory, rewards, rebirth, saving) and adds a data-driven skill tree, economy modifiers, and clearer asset/config structure.
+
+---
+
+## 1) Rojo project setup
+
 1. Install [Rojo](https://rojo.space/).
-2. Open the experience in Roblox Studio.
-3. Keep your existing `StarterGui/YourUiPack!` hierarchy in Studio.
-4. Run `rojo serve` from the repository root and connect Studio.
-5. Update the placeholder IDs, assets, and balance values before publishing.
+2. Open your place in Roblox Studio.
+3. Keep your existing `StarterGui/YourUiPack!` hierarchy.
+4. Run `rojo serve` from repository root.
+5. Connect Studio to Rojo.
+6. Replace placeholder IDs and balancing values before publishing.
 
-## Project layout
-- `/default.project.json` - Rojo project file.
-- `/src/ReplicatedStorage/Shared` - shared config, utility, and remote definitions.
-- `/src/ServerScriptService/Server` - server services for data, rolling, rewards, rebirths, and purchases.
-- `/src/StarterPlayer/StarterPlayerScripts` - client bootstrap and UI logic.
-- `/src/ServerStorage/Assets` - place reward models, pets, and roll effects here.
-- `/src/Workspace`, `/src/Lighting`, `/src/SoundService`, `/src/TextChatService`, `/src/Teams` - service folders ready for Studio content.
+`default.project.json` already maps Roblox services to `src/*` folders.
 
-## Customization guide
-### Where to change roll chances
+---
+
+## 2) Folder structure
+
+```text
+src/
+  ReplicatedStorage/
+    Shared/
+      Config/
+        AnimationConfig.lua
+        AssetConfig.lua
+        DataConfig.lua
+        DeveloperProducts.lua
+        EconomyConfig.lua
+        Gamepasses.lua
+        ProgressionConfig.lua
+        Rarities.lua
+        Rewards.lua
+        RollConfig.lua
+        SkillTreeConfig.lua
+        UIConfig.lua
+      Systems/
+        SkillTree.lua
+      Util/
+        FormatUtil.lua
+        SafeWait.lua
+        TableUtil.lua
+        Trove.lua
+        WeightedRandom.lua
+      RemoteDefinitions.lua
+
+  ServerScriptService/
+    ServerBootstrap.server.lua
+    Server/
+      Services/
+        AssetService.lua
+        DataService.lua
+        MonetizationService.lua
+        RebirthService.lua
+        RemoteService.lua
+        RewardApplier.lua
+        RewardService.lua
+        RNGService.lua
+        SkillTreeService.lua
+
+  StarterPlayer/
+    StarterPlayerScripts/
+      ClientBootstrap.client.lua
+      Client/
+        Controllers/
+          NotificationController.lua
+          UIController.lua
+
+  ServerStorage/
+    Assets/
+      RewardModels/
+      Pets/
+      Enemies/
+      Items/
+      RollEffects/
+      Icons/
+      Sounds/
+      Animations/
+```
+
+---
+
+## 3) Core systems included
+
+- Core progression loop (roll -> collect -> upgrade -> rebirth)
+- Currency system (coins, gems, skill points)
+- Collection/inventory + index tracking
+- Reward handling (daily, playtime, monetization, skill tree)
+- Data-driven skill tree with dependencies and GUI references
+- Unlock requirements/dependencies for progression and skill nodes
+- Rebirth/reset system
+- Save/load with session lock + fallback mode
+- Gamepass and developer product hooks
+- Notification and feedback hooks
+- Data-driven rarity and reward tables
+- Automation loop (auto-roll), plus combat-power stat hook for combat templates
+- Memory cleanup helpers (`Trove`) and safe missing-reference behavior (`SafeWait`)
+
+---
+
+## 4) Beginner setup checklist (what to edit)
+
+### A) Add models and assets
+
+- Reward outcome models: `src/ServerStorage/Assets/RewardModels`
+- Pet models: `src/ServerStorage/Assets/Pets`
+- Enemy models: `src/ServerStorage/Assets/Enemies`
+- Item models: `src/ServerStorage/Assets/Items`
+- Roll effects: `src/ServerStorage/Assets/RollEffects`
+- Optional icon assets: `src/ServerStorage/Assets/Icons`
+- Optional sounds: `src/ServerStorage/Assets/Sounds`
+- Optional animations: `src/ServerStorage/Assets/Animations`
+
+Asset folder names are configured in `AssetConfig.lua`.
+
+### B) Add/modify collectible outcomes
+
 Edit `src/ReplicatedStorage/Shared/Config/RollConfig.lua`.
-- Each entry uses a `Weight` value for weighted rolling.
-- Higher weights make outcomes more common.
-- `DisplayOdds` is the text shown to players.
-- `Zone` decides which Discover card and unlock requirements apply.
 
-### Where to add new models
-Add models to `src/ServerStorage/Assets/RewardModels`.
-- Model names must match `ModelName` in `RollConfig.lua` exactly.
-- If you want client-visible preview assets, mirror lightweight display assets under `ReplicatedStorage` later.
+Each entry should keep stable keys:
+- `Id` (unique save key; do not change after release)
+- `DisplayName` (UI name)
+- `Rarity` (must exist in `Rarities.lua`)
+- `Weight` (roll weighting)
+- `Zone` (must exist in `ProgressionConfig.lua`)
+- `ModelName` (must match a model in `Assets/RewardModels`)
+- `RewardCoins` (base coin reward)
 
-### Where to add gamepass IDs
-Edit `src/ReplicatedStorage/Shared/Config/Gamepasses.lua`.
-- Replace each placeholder `Id = 0` with the correct Roblox gamepass ID.
-- The server checks ownership and applies multipliers automatically.
+### C) Set progression/economy values
 
-### Where to add developer product IDs
-Edit `src/ReplicatedStorage/Shared/Config/DeveloperProducts.lua`.
-- Replace each placeholder `Id = 0` with your developer product ID.
-- Rewards are granted through `ProcessReceipt`.
+- Discover/rebirth requirements: `ProgressionConfig.lua`
+- Rebirth reset behavior + skill points + automation defaults: `EconomyConfig.lua`
+- DataStore retry/autosave/session-lock settings: `DataConfig.lua`
 
-### Where to change UI text
-Use your existing Studio UI for visual text defaults, then adjust script-driven text in:
-- `src/ReplicatedStorage/Shared/Config/UIConfig.lua`
-- `src/StarterPlayer/StarterPlayerScripts/Client/Controllers/UIController.lua`
+### D) Edit reward tables
 
-### Where to change reward tables
-Edit `src/ReplicatedStorage/Shared/Config/Rewards.lua`.
-- Daily rewards live in `Rewards.Daily`.
-- Playtime rewards live in `Rewards.Playtime`.
-- Starter rewards can be added through reward application logic if desired.
+- Daily and playtime rewards: `Rewards.lua`
+- Reward formats are processed in `RewardApplier.lua`
 
-### Where to change animations, sounds, and icons
-Edit:
-- `src/ReplicatedStorage/Shared/Config/AnimationConfig.lua`
-- `src/ReplicatedStorage/Shared/Config/RollConfig.lua`
-- `src/ServerStorage/Assets/RollEffects`
-- `src/SoundService/README.md`
+### E) Set monetization IDs
 
-### Where to add new rarities or new roll outcomes
-- Add rarities in `src/ReplicatedStorage/Shared/Config/Rarities.lua`.
-- Add outcomes in `src/ReplicatedStorage/Shared/Config/RollConfig.lua`.
-- Add matching index slots in Studio if you want more visible entries than the current template provides.
+- Gamepasses and effects: `Gamepasses.lua`
+- Developer products and rewards: `DeveloperProducts.lua`
 
-### Where to configure data saving settings
-Edit `src/ReplicatedStorage/Shared/Config/DataConfig.lua`.
-- Store name
-- retry counts
-- retry delays
-- autosave interval
-- session lock timeout
+### F) Add skill tree nodes and costs
 
-## Asset and naming conventions
-- `RollConfig.ModelName` must match the model stored in `ServerStorage/Assets/RewardModels`.
-- `RollConfig.Id` should stay unique and stable once you ship.
-- Use the same key in configs, saved inventory, and UI mapping to avoid broken references.
-- Placeholder icons, sounds, and animation IDs are expected to be replaced with your own asset IDs.
+- Node definitions: `SkillTreeConfig.lua`
+- Skill tree logic/evaluation: `Shared/Systems/SkillTree.lua`
+- Server purchase/save/state flow: `SkillTreeService.lua`
 
-## Existing UI reference guide
-The scripts do **not** create any UI. They only reference your existing hierarchy under:
-- `Players.LocalPlayer.PlayerGui:WaitForChild("YourUiPack!")`
+### G) Connect skill tree to existing GUI
 
-Top-level objects expected under `YourUiPack!`:
-- `DailyRewards` - panel for the 7-day login reward track.
-- `PlaytimeRewards` - panel for timed reward claims.
-- `Rewards` - roll result panel plus monetization shortcut button.
-- `Discover` - progression cards for zone unlock progress.
-- `Index` - collection book showing discovered outcomes.
-- `Rebirth` - rebirth progress and purchase shortcuts.
-- `LeftSide` - main navigation buttons.
-- `LeftBottomBar` - rolling and quick action buttons.
+For each node in `SkillTreeConfig.lua`, set:
+- `Gui.ButtonPath` to the existing button path in `YourUiPack!`
+- Optional detail label paths:
+  - `Gui.NamePath`
+  - `Gui.DescriptionPath`
+  - `Gui.CostPath`
+  - `Gui.StatusPath`
 
-### Exact paths used by the client scripts
-#### Required root panel access
-- `Players.LocalPlayer.PlayerGui:WaitForChild("YourUiPack!")`
-- `ui:WaitForChild("DailyRewards")`
-- `ui:WaitForChild("Index")`
-- `ui:WaitForChild("Rebirth")`
-- `ui:WaitForChild("Rewards")`
-- `ui:WaitForChild("Discover")`
-- `ui:WaitForChild("PlaytimeRewards")`
-- `ui:WaitForChild("LeftSide")`
-- `ui:WaitForChild("LeftBottomBar")`
+The scripts **only reference existing objects** and do not create UI.
 
-#### Navigation buttons expected
-- `YourUiPack!.LeftSide.ReadyBtn` - opens `DailyRewards`.
-- `YourUiPack!.LeftSide.ShopBtn` - opens `Rewards`.
-- `YourUiPack!.LeftSide.IndexBtn` - opens `Index`.
-- `YourUiPack!.LeftSide.RebirthBtn` - opens `Rebirth`.
-- `YourUiPack!.LeftBottomBar.IconBtn01` - performs a roll.
-- `YourUiPack!.LeftBottomBar.IconBtn02` - toggles auto-roll.
-- `YourUiPack!.LeftBottomBar.IconBtn03` - opens `Discover`.
-- `YourUiPack!.LeftBottomBar.IconBtn04` - prompts the configured luck developer product.
-- `YourUiPack!.LeftBottomBar.IconBtn05` - opens `PlaytimeRewards`.
+### H) Adjust UI path mapping
 
-#### Other UI objects used
-- `DailyRewards.Header.CloseBtn` - closes the daily reward panel.
-- `DailyRewards.Content.Slot01` through `Slot07` - claimable daily reward buttons.
-- `PlaytimeRewards.Header.CloseBtn` - closes the playtime panel.
-- `PlaytimeRewards.Content.Main.Rewards` - contains the timed reward buttons used in order.
-- `Rewards.Header.CloseBtn` - closes the roll result panel.
-- `Rewards.Content.WatchBtn` - prompts the configured ad/luck developer product.
-- `Discover.Normal`, `Discover.Candy`, `Discover.Gold`, `Discover.Diamond`, `Discover.Rainbow`, `Discover.Vulcan` - progression cards updated by scripts.
-- `Index.Main.Header.CloseBtn` - closes the index panel.
-- `Index.Main.Content` - holds prebuilt item slots; scripts update existing buttons in order.
-- `Rebirth.Header.CloseBtn` - closes the rebirth panel.
-- `Rebirth.Content.Btns.RebirthBtn` - attempts a rebirth.
-- `Rebirth.Content.Btns.SkipRebirthBtn` - prompts the configured skip rebirth developer product.
+Edit `UIConfig.lua` to match your exact `YourUiPack!` hierarchy.
 
-If any of these objects are missing, the scripts warn clearly and skip that behavior instead of creating replacements.
+---
 
-## Notes
-- This template uses a Trove-style cleanup helper for connections and temporary resources.
-- Fallback profiles allow play even when DataStore loading fails, but fallback sessions do not save.
-- Review all placeholder IDs before publishing.
+## 5) Skill tree data model
+
+Each node in `SkillTreeConfig.lua` supports:
+- `Id` (unique string id)
+- `Name`
+- `Description`
+- `Cost` (`Currency`, `Amount`)
+- `UnlockRequirements` (rolls/rebirth/items)
+- `ParentDependencies` (required node ids)
+- `Rewards` (what is granted on unlock)
+- `Category` (branch name)
+- `Gui` paths for existing UI references
+
+Current supported reward types include:
+- `Coins`, `Gems`, `SkillPoints`, `Item`, `LuckBoost`
+- `CoinMultiplier`, `GemMultiplier`, `LuckBonus`
+- `AutoRollInterval`, `CombatPower`, `UnlockZone`, `AutoRoll`
+
+Unlocked nodes are saved per player in profile data (`SkillTree.UnlockedNodes`).
+
+---
+
+## 6) Existing UI references (no UI creation in code)
+
+Root expected path:
+- `Players.LocalPlayer.PlayerGui.YourUiPack!`
+
+Already-used panels/buttons:
+- `DailyRewards`, `PlaytimeRewards`, `Rewards`, `Discover`, `Index`, `Rebirth`, `LeftSide`, `LeftBottomBar`
+
+Skill tree panel expected (optional but recommended for full template):
+- `YourUiPack!.SkillTree`
+- Close button path default: `SkillTree.Header.CloseBtn`
+- Navigation button path default: `LeftSide.SkillTreeBtn`
+- Node button paths are configured per node in `SkillTreeConfig.lua`
+
+If configured paths are missing, scripts warn and skip behavior safely.
+
+---
+
+## 7) Naming conventions (important)
+
+- `RollConfig.Id` must stay stable forever after live release.
+- `RollConfig.ModelName` must match ServerStorage model names exactly.
+- `Rarity` values in roll entries must match keys in `Rarities.lua`.
+- `Zone` values in roll entries must match `ProgressionConfig.DiscoverZones[].Id`.
+- Skill tree `ParentDependencies` values must match other skill node `Id` values.
+- Use consistent keys across config, save data, and UI binding paths.
+
+---
+
+## 8) Fallback + warning behavior
+
+- Missing UI objects: handled by `SafeWait` with warnings.
+- Missing asset folders/models: warned by `AssetService`.
+- Missing reward fallback model: warning emitted; game avoids hard crash.
+- DataStore failure/session lock: fallback profile mode allows play, but does not save.
+
+---
+
+## 9) Reskin workflow (pets/enemies/items themes)
+
+1. Replace models in `ServerStorage/Assets/*` folders.
+2. Rename and rebalance entries in `RollConfig.lua`.
+3. Update rarity colors/order in `Rarities.lua`.
+4. Update progression pacing in `ProgressionConfig.lua` and `EconomyConfig.lua`.
+5. Update skill tree branches/nodes in `SkillTreeConfig.lua`.
+6. Remap UI object paths in `UIConfig.lua` and node `Gui` paths.
+7. Replace gamepass/product IDs in config files.
+
+No code rewrite should be required for normal content expansion.

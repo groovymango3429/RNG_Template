@@ -7,12 +7,13 @@ local Config = Shared:WaitForChild("Config")
 local Util = Shared:WaitForChild("Util")
 
 local DataConfig = require(Config:WaitForChild("DataConfig"))
+local EconomyConfig = require(Config:WaitForChild("EconomyConfig"))
 local TableUtil = require(Util:WaitForChild("TableUtil"))
 
 local function buildDefaultProfile(userId: number)
     return {
         Meta = {
-            SchemaVersion = 1,
+            SchemaVersion = 2,
             UserId = userId,
             SaveMode = "Normal",
             LastLoadAt = 0,
@@ -24,10 +25,12 @@ local function buildDefaultProfile(userId: number)
             PlaceId = 0,
         },
         Stats = {
-            Coins = 0,
-            Gems = 0,
-            Rolls = 0,
-            Rebirths = 0,
+            Coins = EconomyConfig.StartingStats.Coins,
+            Gems = EconomyConfig.StartingStats.Gems,
+            Rolls = EconomyConfig.StartingStats.Rolls,
+            Rebirths = EconomyConfig.StartingStats.Rebirths,
+            CombatPower = EconomyConfig.StartingStats.CombatPower,
+            SkillPoints = EconomyConfig.StartingStats.SkillPoints,
         },
         Settings = {
             AutoRoll = false,
@@ -53,6 +56,19 @@ local function buildDefaultProfile(userId: number)
         Purchases = {
             Gamepasses = {} :: {[string]: boolean},
             Products = {} :: {[string]: number},
+        },
+        SkillTree = {
+            UnlockedNodes = {} :: {[string]: boolean},
+        },
+        Unlocks = {
+            Zones = {} :: {[string]: boolean},
+        },
+        Modifiers = {
+            LuckBonus = 0,
+            CoinMultiplier = 0,
+            GemMultiplier = 0,
+            AutoRollIntervalReduction = 0,
+            CombatPowerBonus = 0,
         },
     }
 end

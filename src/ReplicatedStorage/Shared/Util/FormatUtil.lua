@@ -34,6 +34,20 @@ function FormatUtil.Reward(reward)
         return string.format("%sx %s", reward.Amount or 1, reward.ItemId or "Reward")
     elseif reward.Type == "AutoRoll" then
         return "Auto Roll Unlock"
+    elseif reward.Type == "SkillPoints" then
+        return string.format("%s Skill Points", FormatUtil.Number(reward.Amount or 0))
+    elseif reward.Type == "CoinMultiplier" then
+        return string.format("+%d%% Coin Rewards", math.floor((reward.Amount or 0) * 100))
+    elseif reward.Type == "GemMultiplier" then
+        return string.format("+%d%% Gem Rewards", math.floor((reward.Amount or 0) * 100))
+    elseif reward.Type == "LuckBonus" then
+        return string.format("+%.2f Luck", reward.Amount or 0)
+    elseif reward.Type == "AutoRollInterval" then
+        return string.format("-%0.2fs Auto Roll Interval", reward.Amount or 0)
+    elseif reward.Type == "CombatPower" then
+        return string.format("+%s Combat Power", FormatUtil.Number(reward.Amount or 0))
+    elseif reward.Type == "UnlockZone" then
+        return string.format("Unlocks zone: %s", reward.ZoneId or "Unknown")
     end
     return reward.Label or reward.Type
 end
