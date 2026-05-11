@@ -8,7 +8,7 @@ local Config = Shared:WaitForChild("Config")
 local DeveloperProducts = require(Config:WaitForChild("DeveloperProducts"))
 local UIConfig = require(Config:WaitForChild("UIConfig"))
 
-local ServerFolder = script:WaitForChild("Server")
+local ServerFolder = script.Parent:WaitForChild("Server")
 local Services = ServerFolder:WaitForChild("Services")
 
 local DataService = require(Services:WaitForChild("DataService"))

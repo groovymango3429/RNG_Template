@@ -10,8 +10,8 @@ local DataConfig = require(Config:WaitForChild("DataConfig"))
 local TableUtil = require(Util:WaitForChild("TableUtil"))
 
 local DataService = {
-    _profiles = {},
-    _dirty = {},
+    _profiles = {} :: {[Player]: any},
+    _dirty = {} :: {[Player]: boolean},
     _started = false,
 }
 
