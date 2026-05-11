@@ -56,6 +56,7 @@ function RebirthService:TryRebirth(player, skipRequirement)
         end
         if EconomyConfig.Rebirth.ResetCombatPower then
             profile.Stats.CombatPower = EconomyConfig.StartingStats.CombatPower
+            profile.Modifiers.CombatPowerBonus = 0
         end
 
         profile.Stats.Gems = (profile.Stats.Gems or 0) + state.NextBonusGems

@@ -3,14 +3,6 @@ local SkillTreeConfig = require(script.Parent.Parent.Config:WaitForChild("SkillT
 
 local SkillTree = {}
 
-local function toSet(values)
-    local set = {}
-    for _, value in ipairs(values or {}) do
-        set[value] = true
-    end
-    return set
-end
-
 function SkillTree.BuildNodeMap()
     local map = {}
     for _, node in ipairs(SkillTreeConfig.Nodes) do

@@ -2,7 +2,7 @@
 local RewardApplier = {}
 
 local function getMultiplier(baseValue)
-    return math.max(baseValue or 1, 0)
+    return math.max(baseValue or 0, 0)
 end
 
 function RewardApplier.Apply(profile, reward)
