@@ -19,52 +19,52 @@ A Rojo-ready Roblox RNG template built around modular Luau services, reliable pr
 
 ## Customization guide
 ### Where to change roll chances
-Edit `/home/runner/work/RNG_Template/RNG_Template/src/ReplicatedStorage/Shared/Config/RollConfig.lua`.
+Edit `src/ReplicatedStorage/Shared/Config/RollConfig.lua`.
 - Each entry uses a `Weight` value for weighted rolling.
 - Higher weights make outcomes more common.
 - `DisplayOdds` is the text shown to players.
 - `Zone` decides which Discover card and unlock requirements apply.
 
 ### Where to add new models
-Add models to `/home/runner/work/RNG_Template/RNG_Template/src/ServerStorage/Assets/RewardModels`.
+Add models to `src/ServerStorage/Assets/RewardModels`.
 - Model names must match `ModelName` in `RollConfig.lua` exactly.
 - If you want client-visible preview assets, mirror lightweight display assets under `ReplicatedStorage` later.
 
 ### Where to add gamepass IDs
-Edit `/home/runner/work/RNG_Template/RNG_Template/src/ReplicatedStorage/Shared/Config/Gamepasses.lua`.
+Edit `src/ReplicatedStorage/Shared/Config/Gamepasses.lua`.
 - Replace each placeholder `Id = 0` with the correct Roblox gamepass ID.
 - The server checks ownership and applies multipliers automatically.
 
 ### Where to add developer product IDs
-Edit `/home/runner/work/RNG_Template/RNG_Template/src/ReplicatedStorage/Shared/Config/DeveloperProducts.lua`.
+Edit `src/ReplicatedStorage/Shared/Config/DeveloperProducts.lua`.
 - Replace each placeholder `Id = 0` with your developer product ID.
 - Rewards are granted through `ProcessReceipt`.
 
 ### Where to change UI text
 Use your existing Studio UI for visual text defaults, then adjust script-driven text in:
-- `/home/runner/work/RNG_Template/RNG_Template/src/ReplicatedStorage/Shared/Config/UIConfig.lua`
-- `/home/runner/work/RNG_Template/RNG_Template/src/StarterPlayer/StarterPlayerScripts/Client/Controllers/UIController.lua`
+- `src/ReplicatedStorage/Shared/Config/UIConfig.lua`
+- `src/StarterPlayer/StarterPlayerScripts/Client/Controllers/UIController.lua`
 
 ### Where to change reward tables
-Edit `/home/runner/work/RNG_Template/RNG_Template/src/ReplicatedStorage/Shared/Config/Rewards.lua`.
+Edit `src/ReplicatedStorage/Shared/Config/Rewards.lua`.
 - Daily rewards live in `Rewards.Daily`.
 - Playtime rewards live in `Rewards.Playtime`.
 - Starter rewards can be added through reward application logic if desired.
 
 ### Where to change animations, sounds, and icons
 Edit:
-- `/home/runner/work/RNG_Template/RNG_Template/src/ReplicatedStorage/Shared/Config/AnimationConfig.lua`
-- `/home/runner/work/RNG_Template/RNG_Template/src/ReplicatedStorage/Shared/Config/RollConfig.lua`
-- `/home/runner/work/RNG_Template/RNG_Template/src/ServerStorage/Assets/RollEffects`
-- `/home/runner/work/RNG_Template/RNG_Template/src/SoundService/README.md`
+- `src/ReplicatedStorage/Shared/Config/AnimationConfig.lua`
+- `src/ReplicatedStorage/Shared/Config/RollConfig.lua`
+- `src/ServerStorage/Assets/RollEffects`
+- `src/SoundService/README.md`
 
 ### Where to add new rarities or new roll outcomes
-- Add rarities in `/home/runner/work/RNG_Template/RNG_Template/src/ReplicatedStorage/Shared/Config/Rarities.lua`.
-- Add outcomes in `/home/runner/work/RNG_Template/RNG_Template/src/ReplicatedStorage/Shared/Config/RollConfig.lua`.
+- Add rarities in `src/ReplicatedStorage/Shared/Config/Rarities.lua`.
+- Add outcomes in `src/ReplicatedStorage/Shared/Config/RollConfig.lua`.
 - Add matching index slots in Studio if you want more visible entries than the current template provides.
 
 ### Where to configure data saving settings
-Edit `/home/runner/work/RNG_Template/RNG_Template/src/ReplicatedStorage/Shared/Config/DataConfig.lua`.
+Edit `src/ReplicatedStorage/Shared/Config/DataConfig.lua`.
 - Store name
 - retry counts
 - retry delays
