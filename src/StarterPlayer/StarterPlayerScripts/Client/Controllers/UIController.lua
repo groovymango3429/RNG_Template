@@ -110,8 +110,9 @@ function UIController:_invoke(remoteName, ...)
         return nil
     end
 
+    local args = table.pack(...)
     local success, result = pcall(function()
-        return remote:InvokeServer(...)
+        return remote:InvokeServer(table.unpack(args, 1, args.n))
     end)
     if not success then
         self._notifier:Show({ Kind = "Error", Message = string.format("Remote %s failed.", remoteName) })

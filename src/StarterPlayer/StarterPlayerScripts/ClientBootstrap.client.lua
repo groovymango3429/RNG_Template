@@ -10,7 +10,7 @@ for _, definition in ipairs(RemoteDefinitions.Entries) do
     remotes[definition.Name] = remotesFolder:WaitForChild(definition.Name)
 end
 
-local Client = script:WaitForChild("Client")
+local Client = script.Parent:WaitForChild("Client")
 local Controllers = Client:WaitForChild("Controllers")
 
 local NotificationController = require(Controllers:WaitForChild("NotificationController"))
