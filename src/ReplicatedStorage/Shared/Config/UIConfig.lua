@@ -1,0 +1,40 @@
+--!strict
+return {
+    RootGui = "YourUiPack!",
+    Panels = {
+        "DailyRewards",
+        "PlaytimeRewards",
+        "Rewards",
+        "Discover",
+        "Index",
+        "Rebirth",
+        "LeftSide",
+        "LeftBottomBar",
+    },
+    NavigationButtons = {
+        DailyRewards = { "LeftSide", "ReadyBtn" },
+        Rewards = { "LeftSide", "ShopBtn" },
+        Index = { "LeftSide", "IndexBtn" },
+        Rebirth = { "LeftSide", "RebirthBtn" },
+        Discover = { "LeftBottomBar", "IconBtn03" },
+        PlaytimeRewards = { "LeftBottomBar", "IconBtn05" },
+    },
+    ActionButtons = {
+        Roll = { "LeftBottomBar", "IconBtn01" },
+        AutoRoll = { "LeftBottomBar", "IconBtn02" },
+        LuckProduct = { "LeftBottomBar", "IconBtn04" },
+        RewardsWatch = { "Rewards", "Content", "WatchBtn" },
+        Rebirth = { "Rebirth", "Content", "Btns", "RebirthBtn" },
+        SkipRebirth = { "Rebirth", "Content", "Btns", "SkipRebirthBtn" },
+    },
+    CloseButtons = {
+        DailyRewards = { "DailyRewards", "Header", "CloseBtn" },
+        PlaytimeRewards = { "PlaytimeRewards", "Header", "CloseBtn" },
+        Rewards = { "Rewards", "Header", "CloseBtn" },
+        Index = { "Index", "Main", "Header", "CloseBtn" },
+        Rebirth = { "Rebirth", "Header", "CloseBtn" },
+    },
+    DiscoverOrder = { "Normal", "Candy", "Gold", "Diamond", "Rainbow", "Vulcan" },
+    FeaturedProductKey = "LuckBurst",
+    RebirthSkipProductKey = "SkipRebirth",
+}
