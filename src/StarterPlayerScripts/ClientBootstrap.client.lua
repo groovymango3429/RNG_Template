@@ -51,13 +51,11 @@ local function fadeOutLoadingScreen(loadingGui)
 
     local fadeDuration = UIConfig.Loading.FadeDuration
     local tweenInfo = TweenInfo.new(fadeDuration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-    local tweens = {}
     local processed = {}
 
     local function addTween(instance, properties)
         local tween = TweenService:Create(instance, tweenInfo, properties)
         tween:Play()
-        table.insert(tweens, tween)
     end
 
     local function process(instance)
