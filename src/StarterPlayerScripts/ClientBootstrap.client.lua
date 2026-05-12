@@ -67,11 +67,12 @@ local function fadeOutLoadingScreen(loadingGui)
         if instance:IsA("CanvasGroup") then
             addTween(instance, { GroupTransparency = 1 })
         elseif instance:IsA("GuiObject") then
-            addTween(instance, { BackgroundTransparency = 1 })
             if instance:IsA("ImageLabel") or instance:IsA("ImageButton") then
-                addTween(instance, { ImageTransparency = 1 })
+                addTween(instance, { BackgroundTransparency = 1, ImageTransparency = 1 })
             elseif instance:IsA("TextLabel") or instance:IsA("TextButton") or instance:IsA("TextBox") then
-                addTween(instance, { TextTransparency = 1 })
+                addTween(instance, { BackgroundTransparency = 1, TextTransparency = 1 })
+            else
+                addTween(instance, { BackgroundTransparency = 1 })
             end
         elseif instance:IsA("UIStroke") then
             addTween(instance, { Transparency = 1 })
