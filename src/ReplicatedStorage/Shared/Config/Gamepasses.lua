@@ -1,10 +1,5 @@
 --!strict
 return {
-    AutoRoll = {
-        Id = 0,
-        Label = "Auto Roll",
-        UnlocksAutoRoll = true,
-    },
     DoubleLuck = {
         Id = 0,
         Label = "Double Luck",

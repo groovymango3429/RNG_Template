@@ -99,10 +99,6 @@ function MonetizationService:GetLuckModifier(player)
     return modifier
 end
 
-function MonetizationService:CanUseAutoRoll(player)
-    return self:HasGamepass(player, "AutoRoll")
-end
-
 function MonetizationService:PromptGamepass(player, key)
     local definition = Gamepasses[key]
     if not definition then

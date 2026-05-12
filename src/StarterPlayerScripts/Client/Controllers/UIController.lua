@@ -67,6 +67,8 @@ function UIController.new(remotes, notifier)
     self._ui = SafeWait.WaitForChild(self._playerGui, UIConfig.RootGui, 15)
     self._panels = {}
     self._rollTable = {}
+    self._rollPanelOriginalPosition = nil
+    self._rollPanelOriginalAnchorPoint = nil
 
     if self._ui then
         for _, panelName in ipairs(UIConfig.Panels) do
@@ -76,6 +78,7 @@ function UIController.new(remotes, notifier)
         self:_bindActions()
         self:_bindCloseButtons()
         self:_bindRewardButtons()
+        self:_captureRollPanelLayout()
     end
 
     return self
@@ -386,7 +389,40 @@ function UIController:_updateRewardPanel(snapshot)
     end
 end
 
+function UIController:_captureRollPanelLayout()
+    local rollPanel = self._panels.Rewards
+    if not rollPanel or not rollPanel:IsA("GuiObject") then
+        return
+    end
+
+    self._rollPanelOriginalPosition = rollPanel.Position
+    self._rollPanelOriginalAnchorPoint = rollPanel.AnchorPoint
+end
+
+function UIController:_updateRollPanelLayout(snapshot)
+    local rollPanel = self._panels.Rewards
+    if not rollPanel or not rollPanel:IsA("GuiObject") then
+        return
+    end
+
+    local isAutoRollEnabled = snapshot.Stats and snapshot.Stats.AutoRoll == true
+    if isAutoRollEnabled then
+        rollPanel.AnchorPoint = UIConfig.AutoRoll.RollPanelTopAnchorPoint
+        rollPanel.Position = UIConfig.AutoRoll.RollPanelTopPosition
+        return
+    end
+
+    if self._rollPanelOriginalAnchorPoint then
+        rollPanel.AnchorPoint = self._rollPanelOriginalAnchorPoint
+    end
+    if self._rollPanelOriginalPosition then
+        rollPanel.Position = self._rollPanelOriginalPosition
+    end
+end
+
 function UIController:_updateAutoRollState(snapshot)
+    self:_updateRollPanelLayout(snapshot)
+
     if self._autoRollThread then
         task.cancel(self._autoRollThread)
         self._autoRollThread = nil
@@ -425,7 +461,6 @@ function UIController:PlayRollResult(result)
         return
     end
 
-    self:_openPanel("Rewards")
     local nameLabel = findLabel(self._panels.Rewards, {
         { "Content", "Label01", "Main" },
         { "Header", "Label01", "Main" },

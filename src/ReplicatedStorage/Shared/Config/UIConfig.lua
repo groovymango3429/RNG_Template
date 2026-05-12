@@ -37,4 +37,13 @@ return {
     DiscoverOrder = { "Normal", "Candy", "Gold", "Diamond", "Rainbow", "Vulcan" },
     FeaturedProductKey = "LuckBurst",
     RebirthSkipProductKey = "SkipRebirth",
+    Loading = {
+        ScreenGuiName = "LoadingScreen",
+        PreloadAssetsFolder = "Assets",
+        FadeDuration = 0.35,
+    },
+    AutoRoll = {
+        RollPanelTopPosition = UDim2.new(0.5, 0, 0.08, 0),
+        RollPanelTopAnchorPoint = Vector2.new(0.5, 0),
+    },
 }
