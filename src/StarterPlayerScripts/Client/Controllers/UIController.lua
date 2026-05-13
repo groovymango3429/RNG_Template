@@ -20,6 +20,9 @@ local UIConfig = require(Config:WaitForChild("UIConfig"))
 local UIController = {}
 UIController.__index = UIController
 
+local INVALID_ASSET_ID = "rbxassetid://0"
+local MIN_FADE_RANGE = 0.01
+
 local function setText(instance, text)
     if instance and instance:IsA("TextLabel") then
         instance.Text = text
@@ -577,7 +580,7 @@ function UIController:_preloadRollImages(items)
     local targets = {}
     for _, item in ipairs(items) do
         local icon = item and item.Icon
-        if type(icon) == "string" and icon ~= "" and icon ~= "rbxassetid://0" and not self._preloadedRollImages[icon] then
+        if type(icon) == "string" and icon ~= "" and icon ~= INVALID_ASSET_ID and not self._preloadedRollImages[icon] then
             self._preloadedRollImages[icon] = true
             table.insert(targets, icon)
         end
@@ -836,7 +839,7 @@ function UIController:PlayRollResult(result)
     local token = self._rollAnimationToken
     local sequence, previewSteps = self:_buildRollSequence(result.Item)
     local fadeStartY = AnimationConfig.RollFadeStartY
-    local fadeRange = math.max(AnimationConfig.RollFadeEndY - fadeStartY, 0.01)
+    local fadeRange = math.max(AnimationConfig.RollFadeEndY - fadeStartY, MIN_FADE_RANGE)
 
     self:_hideRollingSlots()
     task.spawn(function()
