@@ -131,7 +131,7 @@ if assetsFolder then
         end
     end
 else
-    warn(string.format("[Loading] Optional preload folder ReplicatedStorage.%s not found; continuing without extra manifest/folder preload targets.", UIConfig.Loading.PreloadAssetsFolder))
+    warn(string.format("[Loading] Optional preload folder ReplicatedStorage.%s not found; skipping manifest/folder preload targets.", UIConfig.Loading.PreloadAssetsFolder))
 end
 
 for _, gui in ipairs(playerGui:GetChildren()) do

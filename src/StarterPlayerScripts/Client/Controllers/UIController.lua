@@ -116,8 +116,8 @@ function UIController:_openPanel(panelName)
     local isCurrentlyOpen = isPanelVisible(targetPanel)
     for name, panel in pairs(self._panels) do
         if panel and (name ~= "LeftSide" and name ~= "LeftBottomBar") then
-            local shouldShowPanel = not isCurrentlyOpen and name == panelName
-            setPanelVisible(panel, shouldShowPanel)
+            local shouldBeVisible = not isCurrentlyOpen and name == panelName
+            setPanelVisible(panel, shouldBeVisible)
         end
     end
 end
