@@ -624,6 +624,7 @@ function UIController:_playWinningReveal(slot, item, token)
 end
 
 function UIController:_buildRollSequence(resultItem)
+    local resolvedResultItem = self:_resolveRollItem(resultItem) or resultItem
     local source = {}
     for _, entry in ipairs(self._rollTable) do
         local resolvedEntry = self:_resolveRollItem(entry)
@@ -632,7 +633,7 @@ function UIController:_buildRollSequence(resultItem)
         end
     end
     if #source == 0 then
-        source = { resultItem }
+        source = { resolvedResultItem }
     end
 
     local previewSteps = math.max(
@@ -644,20 +645,20 @@ function UIController:_buildRollSequence(resultItem)
     local previousId = nil
 
     for index = 1, totalEntries do
-        local candidate = source[self._random:NextInteger(1, #source)]
+        local candidateIndex = self._random:NextInteger(1, #source)
         if #source > 1 and previousId ~= nil then
-            local attempts = 0
-            while candidate and candidate.Id == previousId and attempts < 4 do
-                candidate = source[self._random:NextInteger(1, #source)]
-                attempts += 1
+            local chosen = source[candidateIndex]
+            if chosen and chosen.Id == previousId then
+                candidateIndex = (candidateIndex % #source) + 1
             end
         end
+        local candidate = source[candidateIndex]
         sequence[index] = candidate
         previousId = candidate and candidate.Id or nil
     end
 
     local finalIndex = previewSteps + AnimationConfig.RollCenterSlot
-    sequence[finalIndex] = resultItem
+    sequence[finalIndex] = resolvedResultItem
 
     return sequence, previewSteps
 end
