@@ -87,6 +87,7 @@ local function blendTransparency(baseTransparency, alpha)
 end
 
 local function formatOdds(displayOdds)
+    -- Normalize configured odds text for the rolling label, e.g. "1 in 100" -> "1/100".
     if type(displayOdds) ~= "string" or displayOdds == "" then
         return "1/?"
     end
@@ -523,11 +524,11 @@ function UIController:_playWinningReveal(slot, item, token)
         return
     end
 
-    local fadeDuration = 0.18
+    local fadeDuration = AnimationConfig.RollFadeOutDuration
     local endPosition = UDim2.new(
         self._rollingFinalPosition.X.Scale,
         self._rollingFinalPosition.X.Offset,
-        self._rollingFinalPosition.Y.Scale + 0.04,
+        self._rollingFinalPosition.Y.Scale + AnimationConfig.RollFadeOutOffset,
         self._rollingFinalPosition.Y.Offset
     )
     local movementTween = TweenService:Create(
@@ -555,7 +556,7 @@ end
 
 function UIController:_buildRollSequence(resultItem)
     local source = #self._rollTable > 0 and self._rollTable or { resultItem }
-    local previewSteps = math.max(AnimationConfig.RollCycleCount * 2, AnimationConfig.RollSlotCount + 6)
+    local previewSteps = math.max(AnimationConfig.RollCycleCount * 2, AnimationConfig.RollSlotCount + AnimationConfig.RollPreviewPadding)
     local totalEntries = previewSteps + AnimationConfig.RollSlotCount + 1
     local sequence = {}
 

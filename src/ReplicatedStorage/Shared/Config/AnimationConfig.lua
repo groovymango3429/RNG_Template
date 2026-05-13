@@ -13,6 +13,9 @@ return {
     RollRevealPeakScale = 1.08,
     RollRevealPopDuration = 0.18,
     RollRevealSettleDuration = 0.14,
+    RollFadeOutDuration = 0.18,
+    RollFadeOutOffset = 0.04,
+    RollPreviewPadding = 6,
     DefaultRollSoundId = "rbxassetid://0",
     DefaultRollAnimationId = "rbxassetid://0",
 }
