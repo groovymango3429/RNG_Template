@@ -95,6 +95,7 @@ Top-level objects expected under `YourUiPack!`:
 ### Exact paths used by the client scripts
 #### Required root panel access
 - `Players.LocalPlayer.PlayerGui:WaitForChild("YourUiPack!")`
+- `Players.LocalPlayer.PlayerGui:WaitForChild("Rolling")`
 - `ui:WaitForChild("DailyRewards")`
 - `ui:WaitForChild("Index")`
 - `ui:WaitForChild("Rebirth")`
@@ -116,6 +117,10 @@ Top-level objects expected under `YourUiPack!`:
 - `YourUiPack!.LeftBottomBar.IconBtn05` - opens `PlaytimeRewards`.
 
 #### Other UI objects used
+- `Rolling.Main.ImageLabel` - roll result pet image used by the roulette animation.
+- `Rolling.Main.PetName` - roll result pet name text.
+- `Rolling.Main.Rarity` - roll result odds text.
+- `Rolling.Main.Rarity.UIStroke` - dynamically recolored to the rolled pet rarity color.
 - `DailyRewards.Header.CloseBtn` - closes the daily reward panel.
 - `DailyRewards.Content.Slot01` through `Slot07` - claimable daily reward buttons.
 - `PlaytimeRewards.Header.CloseBtn` - closes the playtime panel.

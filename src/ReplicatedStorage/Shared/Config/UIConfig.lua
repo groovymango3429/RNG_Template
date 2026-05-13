@@ -47,6 +47,16 @@ return {
         PreloadAssetsFolder = "Assets",
         FadeDuration = 0.35,
     },
+    Rolling = {
+        ScreenGuiName = "Rolling",
+        MainPath = { "Main" },
+        ImagePath = { "ImageLabel" },
+        PetNamePath = { "PetName" },
+        RarityPath = { "Rarity" },
+        RarityStrokePath = { "Rarity", "UIStroke" },
+        FinalPosition = UDim2.new(0.5, 0, 0.5, 0),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+    },
     AutoRoll = {
         RollPanelTopPosition = UDim2.new(0.5, 0, 0.08, 0),
         RollPanelTopAnchorPoint = Vector2.new(0.5, 0),
