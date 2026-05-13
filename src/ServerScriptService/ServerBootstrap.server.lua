@@ -121,7 +121,6 @@ RemoteService:Get("RollRequest").OnServerInvoke = function(player)
         }
     end
 
-    RemoteService:Get("RollResult"):FireClient(player, result)
     pushState(player)
     notify(player, string.format("You rolled %s!", result.Item.DisplayName), "Success")
 

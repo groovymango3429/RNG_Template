@@ -141,6 +141,7 @@ function UIController.new(remotes, notifier)
     self._rollingFinalPosition = self._rollingBaseFinalPosition
     self._rollingAnchorPoint = self._rollingBaseAnchorPoint
     self._rollingScaleMultiplier = 1
+    self._rollingSpacingMultiplier = 1
     self._rollAnimationToken = 0
     self._preloadedRollImages = {}
 
@@ -329,6 +330,8 @@ function UIController:RequestRoll()
     local result = self:_invoke("RollRequest")
     if result and not result.Success and result.Message then
         self._notifier:Show({ Kind = "Warning", Message = result.Message })
+    elseif result and result.Success and result.Result and result.Result.Item then
+        self:PlayRollResult(result.Result)
     end
     self._rollBusy = false
 end
@@ -517,7 +520,7 @@ function UIController:_getRollingSlotSpacingPixels()
         slotHeight = 120
     end
 
-    return slotHeight + AnimationConfig.RollSlotPaddingPixels
+    return (slotHeight + AnimationConfig.RollSlotPaddingPixels) * self._rollingSpacingMultiplier
 end
 
 function UIController:_setRollingSlotContent(slot, item)
@@ -891,10 +894,12 @@ function UIController:_updateRollingLayout(snapshot)
         self._rollingAnchorPoint = UIConfig.AutoRoll.RollingPanelTopAnchorPoint or self._rollingBaseAnchorPoint
         self._rollingFinalPosition = UIConfig.AutoRoll.RollingPanelTopPosition or self._rollingBaseFinalPosition
         self._rollingScaleMultiplier = UIConfig.AutoRoll.RollingScale or 1
+        self._rollingSpacingMultiplier = UIConfig.AutoRoll.RollingSpacingScale or 1
     else
         self._rollingAnchorPoint = self._rollingBaseAnchorPoint
         self._rollingFinalPosition = self._rollingBaseFinalPosition
         self._rollingScaleMultiplier = 1
+        self._rollingSpacingMultiplier = 1
     end
 end
 
@@ -957,50 +962,48 @@ function UIController:PlayRollResult(result)
     local slotSpacingPixels = self:_getRollingSlotSpacingPixels()
 
     self:_hideRollingSlots()
-    task.spawn(function()
-        local startedAt = os.clock()
-        while token == self._rollAnimationToken do
-            local progress = math.clamp((os.clock() - startedAt) / AnimationConfig.RollSpinDuration, 0, 1)
-            local eased = TweenService:GetValue(progress, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-            local distance = previewSteps * eased
-            local wholeSteps = math.floor(distance)
-            local fractionalStep = distance - wholeSteps
-            local baseIndex = wholeSteps + 1
+    local startedAt = os.clock()
+    while token == self._rollAnimationToken do
+        local progress = math.clamp((os.clock() - startedAt) / AnimationConfig.RollSpinDuration, 0, 1)
+        local eased = TweenService:GetValue(progress, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+        local distance = previewSteps * eased
+        local wholeSteps = math.floor(distance)
+        local fractionalStep = distance - wholeSteps
+        local baseIndex = wholeSteps + 1
 
-            for slotIndex, slot in ipairs(self._rollingSlots) do
-                local item = sequence[baseIndex + slotIndex - 1] or resolvedResultItem
-                local slotDistanceFromCenter = math.abs((slotIndex - AnimationConfig.RollCenterSlot) + fractionalStep)
-                local yOffset = ((slotIndex - AnimationConfig.RollCenterSlot) + fractionalStep) * slotSpacingPixels
-                local alpha = 0
-                if slotDistanceFromCenter >= fadeStartDistance then
-                    alpha = math.clamp((slotDistanceFromCenter - fadeStartDistance) / fadeRange, 0, 1)
-                end
-                self:_setRollingSlotState(slot, item, yOffset, alpha)
-            end
-
-            if progress >= 1 then
-                break
-            end
-            RunService.Heartbeat:Wait()
-        end
-
-        if token ~= self._rollAnimationToken then
-            return
-        end
-
-        local winningSlot = self._rollingSlots[AnimationConfig.RollCenterSlot]
         for slotIndex, slot in ipairs(self._rollingSlots) do
-            if slotIndex == AnimationConfig.RollCenterSlot then
-                self:_setRollingSlotState(slot, resolvedResultItem, 0, 0)
-            else
-                slot.Visible = false
+            local item = sequence[baseIndex + slotIndex - 1] or resolvedResultItem
+            local slotDistanceFromCenter = math.abs((slotIndex - AnimationConfig.RollCenterSlot) + fractionalStep)
+            local yOffset = ((slotIndex - AnimationConfig.RollCenterSlot) + fractionalStep) * slotSpacingPixels
+            local alpha = 0
+            if slotDistanceFromCenter >= fadeStartDistance then
+                alpha = math.clamp((slotDistanceFromCenter - fadeStartDistance) / fadeRange, 0, 1)
             end
+            self:_setRollingSlotState(slot, item, yOffset, alpha)
         end
 
-        if winningSlot then
-            self:_playWinningReveal(winningSlot, resolvedResultItem, token)
+        if progress >= 1 then
+            break
         end
-    end)
+        RunService.Heartbeat:Wait()
+    end
+
+    if token ~= self._rollAnimationToken then
+        return
+    end
+
+    local winningSlot = self._rollingSlots[AnimationConfig.RollCenterSlot]
+    for slotIndex, slot in ipairs(self._rollingSlots) do
+        if slotIndex == AnimationConfig.RollCenterSlot then
+            self:_setRollingSlotState(slot, resolvedResultItem, 0, 0)
+        else
+            slot.Visible = false
+        end
+    end
+
+    if winningSlot then
+        self:_playWinningReveal(winningSlot, resolvedResultItem, token)
+    end
 end
 
 return UIController
