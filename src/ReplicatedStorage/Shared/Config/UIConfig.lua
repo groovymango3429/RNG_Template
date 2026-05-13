@@ -5,6 +5,7 @@ return {
         "DailyRewards",
         "PlaytimeRewards",
         "Rewards",
+        "Shop",
         "Discover",
         "Index",
         "Rebirth",
@@ -13,11 +14,14 @@ return {
     },
     NavigationButtons = {
         DailyRewards = { "LeftSide", "ReadyBtn" },
-        Rewards = { "LeftSide", "ShopBtn" },
+        Shop = { "LeftSide", "ShopBtn" },
         Index = { "LeftSide", "IndexBtn" },
         Rebirth = { "LeftSide", "RebirthBtn" },
         Discover = { "LeftBottomBar", "IconBtn03" },
         PlaytimeRewards = { "LeftBottomBar", "IconBtn05" },
+    },
+    ExternalPanels = {
+        Shop = { "Shop", "ItemShopUI" },
     },
     ActionButtons = {
         Roll = { "LeftBottomBar", "IconBtn01" },

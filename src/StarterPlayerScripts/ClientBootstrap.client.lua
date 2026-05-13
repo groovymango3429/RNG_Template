@@ -2,6 +2,7 @@
 local ContentProvider = game:GetService("ContentProvider")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -32,6 +33,19 @@ local function collectPreloadTargets(root, targets, seen)
         if isPreloadable(descendant) and not seen[descendant] then
             seen[descendant] = true
             table.insert(targets, descendant)
+        end
+    end
+end
+
+local function collectManifestTargets(manifest, targets, seen)
+    if type(manifest) ~= "table" then
+        return
+    end
+
+    for _, entry in ipairs(manifest) do
+        if type(entry) == "string" and entry ~= "" and not seen[entry] then
+            seen[entry] = true
+            table.insert(targets, entry)
         end
     end
 end
@@ -107,17 +121,24 @@ local assetsFolder = ReplicatedStorage:FindFirstChild(UIConfig.Loading.PreloadAs
 
 if assetsFolder then
     collectPreloadTargets(assetsFolder, preloadTargets, seenTargets)
-else
-    warn(string.format("[Loading] Missing ReplicatedStorage.%s folder for preloads.", UIConfig.Loading.PreloadAssetsFolder))
+    local preloadManifest = assetsFolder:FindFirstChild("PreloadManifest")
+    if preloadManifest and preloadManifest:IsA("ModuleScript") then
+        local ok, manifest = pcall(require, preloadManifest)
+        if ok then
+            collectManifestTargets(manifest, preloadTargets, seenTargets)
+        else
+            warn(string.format("[Loading] Failed to require preload manifest: %s", tostring(manifest)))
+        end
+    end
 end
 
-if mainGui then
-    collectPreloadTargets(mainGui, preloadTargets, seenTargets)
+for _, gui in ipairs(playerGui:GetChildren()) do
+    if gui:IsA("LayerCollector") then
+        collectPreloadTargets(gui, preloadTargets, seenTargets)
+    end
 end
 
-if loadingGui then
-    collectPreloadTargets(loadingGui, preloadTargets, seenTargets)
-end
+collectPreloadTargets(SoundService, preloadTargets, seenTargets)
 
 if #preloadTargets > 0 then
     local ok, err = pcall(function()
