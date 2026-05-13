@@ -22,6 +22,7 @@ UIController.__index = UIController
 
 local INVALID_ASSET_ID = "rbxassetid://0"
 local MIN_FADE_RANGE = 0.01
+local ROLL_DEBUG_PREFIX = "[RollDebug]"
 
 local function setText(instance, text)
     if instance and instance:IsA("TextLabel") then
@@ -121,6 +122,8 @@ function UIController.new(remotes, notifier)
     self._snapshot = nil
     self._rollBusy = false
     self._autoRollThread = nil
+    self._autoRollEnabled = false
+    self._autoRollThreadToken = 0
     self._random = Random.new()
     self._player = Players.LocalPlayer
     self._playerGui = self._player:WaitForChild("PlayerGui")
@@ -160,9 +163,46 @@ function UIController.new(remotes, notifier)
     return self
 end
 
+function UIController:_debugLog(message, ...)
+    print(string.format("%s %s", ROLL_DEBUG_PREFIX, string.format(message, ...)))
+end
+
+function UIController:_debugWarn(message, ...)
+    warn(string.format("%s %s", ROLL_DEBUG_PREFIX, string.format(message, ...)))
+end
+
+function UIController:_describeRollItem(item)
+    local resolved = self:_resolveRollItem(item) or item
+    if type(resolved) ~= "table" then
+        return "UnknownPet(Id=?)"
+    end
+
+    local name = tostring(resolved.DisplayName or resolved.Name or "UnknownPet")
+    local id = tostring(resolved.Id or "?")
+    return string.format("%s(Id=%s)", name, id)
+end
+
+function UIController:_rollItemsMatch(leftItem, rightItem)
+    local leftResolved = self:_resolveRollItem(leftItem) or leftItem
+    local rightResolved = self:_resolveRollItem(rightItem) or rightItem
+    if type(leftResolved) ~= "table" or type(rightResolved) ~= "table" then
+        return false
+    end
+
+    if leftResolved.Id ~= nil and rightResolved.Id ~= nil then
+        return leftResolved.Id == rightResolved.Id
+    end
+
+    return tostring(leftResolved.DisplayName or "") == tostring(rightResolved.DisplayName or "")
+        and tostring(leftResolved.Rarity or "") == tostring(rightResolved.Rarity or "")
+end
+
 function UIController:Destroy()
+    self._rollBusy = false
+    self._autoRollEnabled = false
+    self._autoRollThreadToken += 1
     self._rollAnimationToken += 1
-    self:_hideRollingSlots()
+    self:_resetRollingUI("controller destroy")
     self._trove:Destroy()
 end
 
@@ -218,6 +258,7 @@ function UIController:_invoke(remoteName, ...)
         return remote:InvokeServer(table.unpack(args, 1, args.n))
     end)
     if not success then
+        self:_debugWarn("Roll blocked/failed: remote invoke failed for %s.", tostring(remoteName))
         self._notifier:Show({ Kind = "Error", Message = string.format("Remote %s failed.", remoteName) })
         return nil
     end
@@ -235,6 +276,7 @@ function UIController:_bindActions()
     local autoRollButton = self._ui and SafeWait.FindPath(self._ui, UIConfig.ActionButtons.AutoRoll)
     if autoRollButton and autoRollButton:IsA("GuiButton") then
         self._trove:Connect(autoRollButton.Activated, function()
+            self:_debugLog("Auto-roll toggle requested.")
             local result = self:_invoke("ToggleAutoRoll")
             if result and not result.Success and result.Message then
                 self._notifier:Show({ Kind = "Warning", Message = result.Message })
@@ -282,6 +324,7 @@ function UIController:_bindCloseButtons()
                 local panel = self._panels[panelName]
                 if panel then
                     panel.Visible = false
+                    self:_debugLog("GUI panel closed: %s", panelName)
                 end
             end)
         end
