@@ -132,14 +132,6 @@ RemoteService:Get("RollRequest").OnServerInvoke = function(player)
 end
 
 RemoteService:Get("ToggleAutoRoll").OnServerInvoke = function(player)
-    local hasAutoRoll = MonetizationService:CanUseAutoRoll(player)
-    if not hasAutoRoll then
-        return {
-            Success = false,
-            Message = "Auto roll requires the AutoRoll gamepass.",
-        }
-    end
-
     local profile = DataService:UpdateProfile(player, function(activeProfile)
         activeProfile.Settings.AutoRoll = not activeProfile.Settings.AutoRoll
     end)
