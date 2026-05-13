@@ -649,7 +649,11 @@ function UIController:_buildRollSequence(resultItem)
         if #source > 1 and previousId ~= nil then
             local chosen = source[candidateIndex]
             if chosen and chosen.Id == previousId then
-                candidateIndex = (candidateIndex % #source) + 1
+                local startIndex = candidateIndex
+                repeat
+                    candidateIndex = (candidateIndex % #source) + 1
+                    chosen = source[candidateIndex]
+                until candidateIndex == startIndex or (chosen and chosen.Id ~= previousId)
             end
         end
         local candidate = source[candidateIndex]
@@ -659,6 +663,9 @@ function UIController:_buildRollSequence(resultItem)
 
     local finalIndex = previewSteps + AnimationConfig.RollCenterSlot
     sequence[finalIndex] = resolvedResultItem
+    for index = finalIndex + 1, totalEntries do
+        sequence[index] = resolvedResultItem
+    end
 
     return sequence, previewSteps
 end
