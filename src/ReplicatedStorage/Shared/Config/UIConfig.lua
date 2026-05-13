@@ -21,6 +21,7 @@ return {
         PlaytimeRewards = { "LeftBottomBar", "IconBtn05" },
     },
     ExternalPanels = {
+        -- Path entries are traversed in order via SafeWait.FindPath from PlayerGui.
         Shop = { "Shop", "ItemShopUI" },
     },
     ActionButtons = {

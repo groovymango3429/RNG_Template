@@ -134,6 +134,7 @@ end
 
 for _, gui in ipairs(playerGui:GetChildren()) do
     if gui:IsA("LayerCollector") then
+        -- Preload every client GUI root so opening any panel later is instant.
         collectPreloadTargets(gui, preloadTargets, seenTargets)
     end
 end
