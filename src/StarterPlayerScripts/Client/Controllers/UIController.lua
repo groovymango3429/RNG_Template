@@ -109,6 +109,7 @@ end
 function UIController:_openPanel(panelName)
     local targetPanel = self._panels[panelName]
     if not targetPanel then
+        warn(string.format("[UI] Missing panel '%s' for navigation.", panelName))
         return
     end
 

@@ -127,7 +127,7 @@ if assetsFolder then
         if ok then
             collectManifestTargets(result, preloadTargets, seenTargets)
         else
-            warn(string.format("[Loading] Failed to require preload manifest: %s", tostring(result)))
+            warn(string.format("[Loading] Failed to require %s: %s", preloadManifestModule:GetFullName(), tostring(result)))
         end
     end
 end
