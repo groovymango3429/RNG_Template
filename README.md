@@ -106,7 +106,7 @@ Top-level objects expected under `YourUiPack!`:
 
 #### Navigation buttons expected
 - `YourUiPack!.LeftSide.ReadyBtn` - opens `DailyRewards`.
-- `YourUiPack!.LeftSide.ShopBtn` - opens `Shop.ItemShopUI`.
+- `YourUiPack!.LeftSide.ShopBtn` - opens `ItemShopUI` inside `PlayerGui.Shop`.
 - `YourUiPack!.LeftSide.IndexBtn` - opens `Index`.
 - `YourUiPack!.LeftSide.RebirthBtn` - opens `Rebirth`.
 - `YourUiPack!.LeftBottomBar.IconBtn01` - performs a roll.

@@ -130,6 +130,8 @@ if assetsFolder then
             warn(string.format("[Loading] Failed to require %s: %s", preloadManifestModule:GetFullName(), tostring(result)))
         end
     end
+else
+    warn(string.format("[Loading] Optional preload folder ReplicatedStorage.%s not found; using PlayerGui and SoundService preloads.", UIConfig.Loading.PreloadAssetsFolder))
 end
 
 for _, gui in ipairs(playerGui:GetChildren()) do
