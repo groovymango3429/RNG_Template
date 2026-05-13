@@ -55,6 +55,7 @@ Edit `src/ReplicatedStorage/Shared/Config/Rewards.lua`.
 Edit:
 - `src/ReplicatedStorage/Shared/Config/AnimationConfig.lua`
 - `src/ReplicatedStorage/Shared/Config/RollConfig.lua`
+- `src/ReplicatedStorage/Assets/PreloadManifest.lua`
 - `src/ServerStorage/Assets/RollEffects`
 - `src/SoundService/README.md`
 
@@ -105,7 +106,7 @@ Top-level objects expected under `YourUiPack!`:
 
 #### Navigation buttons expected
 - `YourUiPack!.LeftSide.ReadyBtn` - opens `DailyRewards`.
-- `YourUiPack!.LeftSide.ShopBtn` - opens `Rewards`.
+- `YourUiPack!.LeftSide.ShopBtn` - opens `ItemShopUI` inside `PlayerGui.Shop`.
 - `YourUiPack!.LeftSide.IndexBtn` - opens `Index`.
 - `YourUiPack!.LeftSide.RebirthBtn` - opens `Rebirth`.
 - `YourUiPack!.LeftBottomBar.IconBtn01` - performs a roll.

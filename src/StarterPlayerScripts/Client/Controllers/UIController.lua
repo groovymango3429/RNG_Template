@@ -54,6 +54,24 @@ local function getOrderedButtons(container)
     return buttons
 end
 
+local function isPanelVisible(panel)
+    if panel:IsA("LayerCollector") then
+        return panel.Enabled
+    end
+    if panel:IsA("GuiObject") then
+        return panel.Visible
+    end
+    return false
+end
+
+local function setPanelVisible(panel, isVisible)
+    if panel:IsA("LayerCollector") then
+        panel.Enabled = isVisible
+    elseif panel:IsA("GuiObject") then
+        panel.Visible = isVisible
+    end
+end
+
 function UIController.new(remotes, notifier)
     local self = setmetatable({}, UIController)
     self._trove = Trove.new()
@@ -72,7 +90,7 @@ function UIController.new(remotes, notifier)
 
     if self._ui then
         for _, panelName in ipairs(UIConfig.Panels) do
-            self._panels[panelName] = SafeWait.WaitForChild(self._ui, panelName, 5)
+            self._panels[panelName] = self:_resolvePanel(panelName)
         end
         self:_bindNavigation()
         self:_bindActions()
@@ -89,11 +107,33 @@ function UIController:Destroy()
 end
 
 function UIController:_openPanel(panelName)
+    local targetPanel = self._panels[panelName]
+    if not targetPanel then
+        warn(string.format("[UI] Missing panel '%s' for navigation.", panelName))
+        return
+    end
+
+    local isCurrentlyOpen = isPanelVisible(targetPanel)
     for name, panel in pairs(self._panels) do
         if panel and (name ~= "LeftSide" and name ~= "LeftBottomBar") then
-            panel.Visible = name == panelName
+            local shouldBeVisible = not isCurrentlyOpen and name == panelName
+            setPanelVisible(panel, shouldBeVisible)
         end
     end
+end
+
+function UIController:_resolvePanel(panelName)
+    local panel = self._ui and self._ui:FindFirstChild(panelName)
+    if panel then
+        return panel
+    end
+
+    local externalPath = UIConfig.ExternalPanels and UIConfig.ExternalPanels[panelName]
+    if externalPath then
+        return SafeWait.FindPath(self._playerGui, externalPath, true)
+    end
+
+    return self._ui and SafeWait.WaitForChild(self._ui, panelName, 5)
 end
 
 function UIController:_bindNavigation()
