@@ -116,7 +116,7 @@ function UIController:_openPanel(panelName)
     local isCurrentlyOpen = isPanelVisible(targetPanel)
     for name, panel in pairs(self._panels) do
         if panel and (name ~= "LeftSide" and name ~= "LeftBottomBar") then
-            local shouldShowPanel = (not isCurrentlyOpen) and (name == panelName)
+            local shouldShowPanel = not isCurrentlyOpen and name == panelName
             setPanelVisible(panel, shouldShowPanel)
         end
     end
@@ -133,7 +133,7 @@ function UIController:_resolvePanel(panelName)
         return SafeWait.FindPath(self._playerGui, externalPath, true)
     end
 
-    return self._ui and SafeWait.WaitForChild(self._ui, panelName, 5) or nil
+    return self._ui and SafeWait.WaitForChild(self._ui, panelName, 5)
 end
 
 function UIController:_bindNavigation()
