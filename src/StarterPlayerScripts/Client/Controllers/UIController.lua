@@ -113,10 +113,6 @@ local function getRarityColor(rarityName)
     return rarity and rarity.Color or Color3.fromRGB(255, 255, 255)
 end
 
-local function getWrappedIndex(index, size)
-    return ((index - 1) % size) + 1
-end
-
 function UIController.new(remotes, notifier)
     local self = setmetatable({}, UIController)
     self._trove = Trove.new()
@@ -125,11 +121,13 @@ function UIController.new(remotes, notifier)
     self._snapshot = nil
     self._rollBusy = false
     self._autoRollThread = nil
+    self._random = Random.new()
     self._player = Players.LocalPlayer
     self._playerGui = self._player:WaitForChild("PlayerGui")
     self._ui = SafeWait.WaitForChild(self._playerGui, UIConfig.RootGui, 15)
     self._panels = {}
     self._rollTable = {}
+    self._rollTableById = {}
     self._rewardsPanelOriginalPosition = nil
     self._rewardsPanelOriginalAnchorPoint = nil
     self._rollingGui = nil
@@ -138,8 +136,11 @@ function UIController.new(remotes, notifier)
     self._rollingSlotRefs = {}
     self._rollingSlotScales = {}
     self._rollingTransparencyBaseline = {}
-    self._rollingFinalPosition = UIConfig.Rolling.FinalPosition
-    self._rollingAnchorPoint = UIConfig.Rolling.AnchorPoint
+    self._rollingBaseFinalPosition = UIConfig.Rolling.FinalPosition
+    self._rollingBaseAnchorPoint = UIConfig.Rolling.AnchorPoint
+    self._rollingFinalPosition = self._rollingBaseFinalPosition
+    self._rollingAnchorPoint = self._rollingBaseAnchorPoint
+    self._rollingScaleMultiplier = 1
     self._rollAnimationToken = 0
     self._preloadedRollImages = {}
 
@@ -393,7 +394,7 @@ function UIController:_hideRollingSlots()
         slot.Visible = false
         local uiScale = self._rollingSlotScales[slot]
         if uiScale then
-            uiScale.Scale = 1
+            uiScale.Scale = self._rollingScaleMultiplier
         end
     end
 end
@@ -459,29 +460,90 @@ function UIController:_ensureRollingSlots()
     return true
 end
 
+function UIController:_refreshRollLookup()
+    self._rollTableById = {}
+    for _, item in ipairs(self._rollTable) do
+        if item and item.Id then
+            self._rollTableById[item.Id] = item
+        end
+    end
+end
+
+function UIController:_resolveRollItem(item)
+    if type(item) ~= "table" then
+        return item
+    end
+
+    local mapped = item.Id and self._rollTableById[item.Id]
+    if not mapped then
+        return item
+    end
+
+    local resolved = table.clone(mapped)
+    for key, value in pairs(item) do
+        resolved[key] = value
+    end
+
+    local resolvedIcon = resolved.Icon
+    if type(resolvedIcon) ~= "string" or resolvedIcon == "" or resolvedIcon == INVALID_ASSET_ID then
+        resolved.Icon = mapped.Icon
+    end
+
+    if not resolved.DisplayOdds or resolved.DisplayOdds == "" then
+        resolved.DisplayOdds = mapped.DisplayOdds
+    end
+    if not resolved.DisplayName or resolved.DisplayName == "" then
+        resolved.DisplayName = mapped.DisplayName
+    end
+    if not resolved.Rarity or resolved.Rarity == "" then
+        resolved.Rarity = mapped.Rarity
+    end
+
+    return resolved
+end
+
+function UIController:_getRollingSlotSpacingPixels()
+    local baseSlot = self._rollingSlots[1] or self._rollingMain
+    if not baseSlot or not baseSlot:IsA("GuiObject") then
+        return 120 + AnimationConfig.RollSlotPaddingPixels
+    end
+
+    local slotHeight = baseSlot.AbsoluteSize.Y
+    if slotHeight <= 0 then
+        local viewportHeight = self._rollingGui and self._rollingGui.AbsoluteSize.Y or 0
+        slotHeight = (baseSlot.Size.Y.Scale * viewportHeight) + baseSlot.Size.Y.Offset
+    end
+    if slotHeight <= 0 then
+        slotHeight = 120
+    end
+
+    return slotHeight + AnimationConfig.RollSlotPaddingPixels
+end
+
 function UIController:_setRollingSlotContent(slot, item)
     local refs = self._rollingSlotRefs[slot]
     if not refs then
         return
     end
 
-    setImage(refs.Image, item and item.Icon or "")
-    setText(refs.PetName, item and item.DisplayName or "")
-    setText(refs.Rarity, formatOdds(item and item.DisplayOdds or ""))
+    local resolvedItem = self:_resolveRollItem(item)
+    setImage(refs.Image, resolvedItem and resolvedItem.Icon or "")
+    setText(refs.PetName, resolvedItem and resolvedItem.DisplayName or "")
+    setText(refs.Rarity, formatOdds(resolvedItem and resolvedItem.DisplayOdds or ""))
 
     local rarityStroke = refs.RarityStroke
     if rarityStroke and rarityStroke:IsA("UIStroke") then
-        rarityStroke.Color = getRarityColor(item and item.Rarity or nil)
+        rarityStroke.Color = getRarityColor(resolvedItem and resolvedItem.Rarity or nil)
     end
 end
 
-function UIController:_setRollingSlotState(slot, item, yScale, alpha)
+function UIController:_setRollingSlotState(slot, item, yOffset, alpha)
     slot.AnchorPoint = self._rollingAnchorPoint
     slot.Position = UDim2.new(
         self._rollingFinalPosition.X.Scale,
         self._rollingFinalPosition.X.Offset,
-        yScale,
-        self._rollingFinalPosition.Y.Offset
+        self._rollingFinalPosition.Y.Scale,
+        self._rollingFinalPosition.Y.Offset + math.floor(yOffset)
     )
     slot.Visible = true
     self:_setRollingSlotContent(slot, item)
@@ -489,22 +551,22 @@ function UIController:_setRollingSlotState(slot, item, yScale, alpha)
 
     local uiScale = self._rollingSlotScales[slot]
     if uiScale then
-        uiScale.Scale = 1
+        uiScale.Scale = self._rollingScaleMultiplier
     end
 end
 
 function UIController:_playWinningReveal(slot, item, token)
-    self:_setRollingSlotState(slot, item, self._rollingFinalPosition.Y.Scale, 0)
+    self:_setRollingSlotState(slot, item, 0, 0)
     slot.Position = self._rollingFinalPosition
 
     local uiScale = self._rollingSlotScales[slot]
     if uiScale then
-        uiScale.Scale = AnimationConfig.RollRevealStartScale
+        uiScale.Scale = AnimationConfig.RollRevealStartScale * self._rollingScaleMultiplier
 
         local popTween = TweenService:Create(
             uiScale,
             TweenInfo.new(AnimationConfig.RollRevealPopDuration, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-            { Scale = AnimationConfig.RollRevealPeakScale }
+            { Scale = AnimationConfig.RollRevealPeakScale * self._rollingScaleMultiplier }
         )
         popTween:Play()
         popTween.Completed:Wait()
@@ -516,7 +578,7 @@ function UIController:_playWinningReveal(slot, item, token)
         local settleTween = TweenService:Create(
             uiScale,
             TweenInfo.new(AnimationConfig.RollRevealSettleDuration, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
-            { Scale = 1 }
+            { Scale = self._rollingScaleMultiplier }
         )
         settleTween:Play()
         settleTween.Completed:Wait()
@@ -562,23 +624,40 @@ function UIController:_playWinningReveal(slot, item, token)
 end
 
 function UIController:_buildRollSequence(resultItem)
-    local source = #self._rollTable > 0 and self._rollTable or { resultItem }
+    local source = {}
+    for _, entry in ipairs(self._rollTable) do
+        local resolvedEntry = self:_resolveRollItem(entry)
+        if resolvedEntry then
+            table.insert(source, resolvedEntry)
+        end
+    end
+    if #source == 0 then
+        source = { resultItem }
+    end
+
     local previewSteps = math.max(
         AnimationConfig.RollCycleCount * AnimationConfig.RollCycleMultiplier,
         AnimationConfig.RollSlotCount + AnimationConfig.RollPreviewPadding
     )
     local totalEntries = previewSteps + AnimationConfig.RollSlotCount + 1
     local sequence = {}
+    local previousId = nil
 
     for index = 1, totalEntries do
-        sequence[index] = source[getWrappedIndex(index, #source)]
+        local candidate = source[self._random:NextInteger(1, #source)]
+        if #source > 1 and previousId ~= nil then
+            local attempts = 0
+            while candidate and candidate.Id == previousId and attempts < 4 do
+                candidate = source[self._random:NextInteger(1, #source)]
+                attempts += 1
+            end
+        end
+        sequence[index] = candidate
+        previousId = candidate and candidate.Id or nil
     end
 
     local finalIndex = previewSteps + AnimationConfig.RollCenterSlot
     sequence[finalIndex] = resultItem
-    for index = finalIndex + 1, totalEntries do
-        sequence[index] = resultItem
-    end
 
     return sequence, previewSteps
 end
@@ -794,8 +873,26 @@ function UIController:_updateRewardsPanelLayout(snapshot)
     end
 end
 
+function UIController:_updateRollingLayout(snapshot)
+    if not self._rollingMain then
+        return
+    end
+
+    local isAutoRollEnabled = snapshot.Stats and snapshot.Stats.AutoRoll == true
+    if isAutoRollEnabled then
+        self._rollingAnchorPoint = UIConfig.AutoRoll.RollingPanelTopAnchorPoint or self._rollingBaseAnchorPoint
+        self._rollingFinalPosition = UIConfig.AutoRoll.RollingPanelTopPosition or self._rollingBaseFinalPosition
+        self._rollingScaleMultiplier = UIConfig.AutoRoll.RollingScale or 1
+    else
+        self._rollingAnchorPoint = self._rollingBaseAnchorPoint
+        self._rollingFinalPosition = self._rollingBaseFinalPosition
+        self._rollingScaleMultiplier = 1
+    end
+end
+
 function UIController:_updateAutoRollState(snapshot)
     self:_updateRewardsPanelLayout(snapshot)
+    self:_updateRollingLayout(snapshot)
 
     if self._autoRollThread then
         task.cancel(self._autoRollThread)
@@ -821,6 +918,7 @@ function UIController:ApplySnapshot(snapshot)
 
     self._snapshot = snapshot
     self._rollTable = snapshot.RollTable or self._rollTable
+    self:_refreshRollLookup()
     self:_preloadRollImages(self._rollTable)
     self:_updateDailyRewards(snapshot.Rewards and snapshot.Rewards.Daily)
     self:_updatePlaytimeRewards(snapshot.Rewards and snapshot.Rewards.Playtime)
@@ -840,13 +938,15 @@ function UIController:PlayRollResult(result)
         return
     end
 
-    self:_preloadRollImages({ result.Item })
+    local resolvedResultItem = self:_resolveRollItem(result.Item) or result.Item
+    self:_preloadRollImages({ resolvedResultItem })
 
     self._rollAnimationToken += 1
     local token = self._rollAnimationToken
-    local sequence, previewSteps = self:_buildRollSequence(result.Item)
-    local fadeStartY = AnimationConfig.RollFadeStartY
-    local fadeRange = math.max(AnimationConfig.RollFadeEndY - fadeStartY, MIN_FADE_RANGE)
+    local sequence, previewSteps = self:_buildRollSequence(resolvedResultItem)
+    local fadeStartDistance = AnimationConfig.RollFadeStartDistance
+    local fadeRange = math.max(AnimationConfig.RollFadeEndDistance - fadeStartDistance, MIN_FADE_RANGE)
+    local slotSpacingPixels = self:_getRollingSlotSpacingPixels()
 
     self:_hideRollingSlots()
     task.spawn(function()
@@ -860,13 +960,14 @@ function UIController:PlayRollResult(result)
             local baseIndex = wholeSteps + 1
 
             for slotIndex, slot in ipairs(self._rollingSlots) do
-                local item = sequence[baseIndex + slotIndex - 1] or result.Item
-                local yScale = self._rollingFinalPosition.Y.Scale + (((slotIndex - AnimationConfig.RollCenterSlot) + fractionalStep) * AnimationConfig.RollSlotSpacing)
+                local item = sequence[baseIndex + slotIndex - 1] or resolvedResultItem
+                local slotDistanceFromCenter = math.abs((slotIndex - AnimationConfig.RollCenterSlot) + fractionalStep)
+                local yOffset = ((slotIndex - AnimationConfig.RollCenterSlot) + fractionalStep) * slotSpacingPixels
                 local alpha = 0
-                if yScale >= fadeStartY then
-                    alpha = math.clamp((yScale - fadeStartY) / fadeRange, 0, 1)
+                if slotDistanceFromCenter >= fadeStartDistance then
+                    alpha = math.clamp((slotDistanceFromCenter - fadeStartDistance) / fadeRange, 0, 1)
                 end
-                self:_setRollingSlotState(slot, item, yScale, alpha)
+                self:_setRollingSlotState(slot, item, yOffset, alpha)
             end
 
             if progress >= 1 then
@@ -882,14 +983,14 @@ function UIController:PlayRollResult(result)
         local winningSlot = self._rollingSlots[AnimationConfig.RollCenterSlot]
         for slotIndex, slot in ipairs(self._rollingSlots) do
             if slotIndex == AnimationConfig.RollCenterSlot then
-                self:_setRollingSlotState(slot, result.Item, self._rollingFinalPosition.Y.Scale, 0)
+                self:_setRollingSlotState(slot, resolvedResultItem, 0, 0)
             else
                 slot.Visible = false
             end
         end
 
         if winningSlot then
-            self:_playWinningReveal(winningSlot, result.Item, token)
+            self:_playWinningReveal(winningSlot, resolvedResultItem, token)
         end
     end)
 end
