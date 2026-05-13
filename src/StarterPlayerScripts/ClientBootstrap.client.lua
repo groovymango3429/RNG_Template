@@ -179,10 +179,6 @@ remotes.StateUpdated.OnClientEvent:Connect(function(snapshot)
     uiController:ApplySnapshot(snapshot)
 end)
 
-remotes.RollResult.OnClientEvent:Connect(function(result)
-    uiController:PlayRollResult(result)
-end)
-
 remotes.Notification.OnClientEvent:Connect(function(payload)
     NotificationController:Show(payload)
 end)
