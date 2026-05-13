@@ -113,6 +113,10 @@ local function getRarityColor(rarityName)
     return rarity and rarity.Color or Color3.fromRGB(255, 255, 255)
 end
 
+local function getWrappedIndex(index, size)
+    return ((index - 1) % size) + 1
+end
+
 function UIController.new(remotes, notifier)
     local self = setmetatable({}, UIController)
     self._trove = Trove.new()
@@ -559,12 +563,15 @@ end
 
 function UIController:_buildRollSequence(resultItem)
     local source = #self._rollTable > 0 and self._rollTable or { resultItem }
-    local previewSteps = math.max(AnimationConfig.RollCycleCount * 2, AnimationConfig.RollSlotCount + AnimationConfig.RollPreviewPadding)
+    local previewSteps = math.max(
+        AnimationConfig.RollCycleCount * AnimationConfig.RollCycleMultiplier,
+        AnimationConfig.RollSlotCount + AnimationConfig.RollPreviewPadding
+    )
     local totalEntries = previewSteps + AnimationConfig.RollSlotCount + 1
     local sequence = {}
 
     for index = 1, totalEntries do
-        sequence[index] = source[((index - 1) % #source) + 1]
+        sequence[index] = source[getWrappedIndex(index, #source)]
     end
 
     local finalIndex = previewSteps + AnimationConfig.RollCenterSlot

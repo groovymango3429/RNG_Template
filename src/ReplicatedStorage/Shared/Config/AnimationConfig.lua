@@ -1,6 +1,7 @@
 --!strict
 return {
     RollCycleCount = 10,
+    RollCycleMultiplier = 2,
     RollCycleDelay = 0.08,
     ResultHoldSeconds = 1.25,
     RollSlotCount = 5,
