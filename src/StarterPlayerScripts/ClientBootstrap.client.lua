@@ -121,9 +121,9 @@ local assetsFolder = ReplicatedStorage:FindFirstChild(UIConfig.Loading.PreloadAs
 
 if assetsFolder then
     collectPreloadTargets(assetsFolder, preloadTargets, seenTargets)
-    local preloadManifest = assetsFolder:FindFirstChild("PreloadManifest")
-    if preloadManifest and preloadManifest:IsA("ModuleScript") then
-        local ok, result = pcall(require, preloadManifest)
+    local preloadManifestModule = assetsFolder:FindFirstChild("PreloadManifest")
+    if preloadManifestModule and preloadManifestModule:IsA("ModuleScript") then
+        local ok, result = pcall(require, preloadManifestModule)
         if ok then
             collectManifestTargets(result, preloadTargets, seenTargets)
         else
