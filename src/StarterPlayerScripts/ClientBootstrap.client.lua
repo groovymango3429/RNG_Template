@@ -123,11 +123,11 @@ if assetsFolder then
     collectPreloadTargets(assetsFolder, preloadTargets, seenTargets)
     local preloadManifest = assetsFolder:FindFirstChild("PreloadManifest")
     if preloadManifest and preloadManifest:IsA("ModuleScript") then
-        local ok, manifest = pcall(require, preloadManifest)
+        local ok, result = pcall(require, preloadManifest)
         if ok then
-            collectManifestTargets(manifest, preloadTargets, seenTargets)
+            collectManifestTargets(result, preloadTargets, seenTargets)
         else
-            warn(string.format("[Loading] Failed to require preload manifest: %s", tostring(manifest)))
+            warn(string.format("[Loading] Failed to require preload manifest: %s", tostring(result)))
         end
     end
 end
