@@ -839,7 +839,7 @@ function UIController:_playWinningReveal(slot, item, token)
     slot.Visible = false
 end
 
-function UIController:_buildRollSequence(resultItem)
+function UIController:_buildRollSequence(resultItem, centerSlotIndex)
     local resolvedResultItem = self:_resolveRollItem(resultItem) or resultItem
     local source = {}
     for _, entry in ipairs(self._rollTable) do
@@ -877,7 +877,6 @@ function UIController:_buildRollSequence(resultItem)
         previousId = candidate and candidate.Id or nil
     end
 
-    local centerSlotIndex = self:_getCenterSlotIndex()
     local finalIndex = previewSteps + centerSlotIndex
     sequence[finalIndex] = resolvedResultItem
     self:_debugLog(
@@ -890,7 +889,7 @@ function UIController:_buildRollSequence(resultItem)
         self:_describeRollItem(resolvedResultItem)
     )
 
-    return sequence, previewSteps
+    return sequence, previewSteps, finalIndex
 end
 
 function UIController:_preloadRollImages(items)
@@ -1198,9 +1197,8 @@ function UIController:PlayRollResult(result)
 
     self._rollAnimationToken += 1
     local token = self._rollAnimationToken
-    local sequence, previewSteps = self:_buildRollSequence(resolvedResultItem)
     local centerSlotIndex = self:_getCenterSlotIndex()
-    local centerSequenceIndex = previewSteps + centerSlotIndex
+    local sequence, previewSteps, centerSequenceIndex = self:_buildRollSequence(resolvedResultItem, centerSlotIndex)
     local middleSequenceItem = sequence[centerSequenceIndex] or resolvedResultItem
     if not self:_rollItemsMatch(middleSequenceItem, resolvedResultItem) then
         self:_debugWarn(
@@ -1291,10 +1289,22 @@ function UIController:PlayRollResult(result)
         return
     end
 
+    local finalBaseIndex = previewSteps + 1
+    for slotIndex, slot in ipairs(self._rollingSlots) do
+        local finalItem = sequence[finalBaseIndex + slotIndex - 1] or resolvedResultItem
+        local slotDistanceFromCenter = math.abs(slotIndex - centerSlotIndex)
+        local positionOffset = (slotIndex - centerSlotIndex) * slotSpacingPixels
+        local alpha = 0
+        if slotDistanceFromCenter >= fadeStartDistance then
+            alpha = math.clamp((slotDistanceFromCenter - fadeStartDistance) / fadeRange, 0, 1)
+        end
+        self:_setRollingSlotState(slot, finalItem, positionOffset, alpha)
+    end
+
     local winningSlot = self._rollingSlots[centerSlotIndex]
     for slotIndex, slot in ipairs(self._rollingSlots) do
         if slotIndex == centerSlotIndex then
-            self:_setRollingSlotState(slot, resolvedResultItem, 0, 0)
+            self:_setRollingSlotState(slot, middleSequenceItem, 0, 0)
         else
             slot.Visible = false
         end
@@ -1302,12 +1312,12 @@ function UIController:PlayRollResult(result)
     self:_debugLog(
         "Winning slot reveal: centerSlot=%d reward=%s winningSlotAbsPos=%s",
         centerSlotIndex,
-        self:_describeRollItem(resolvedResultItem),
+        self:_describeRollItem(middleSequenceItem),
         winningSlot and formatVector2(winningSlot.AbsolutePosition) or "nil"
     )
 
     if winningSlot then
-        self:_playWinningReveal(winningSlot, resolvedResultItem, token)
+        self:_playWinningReveal(winningSlot, middleSequenceItem, token)
     end
 
     if token ~= self._rollAnimationToken then
