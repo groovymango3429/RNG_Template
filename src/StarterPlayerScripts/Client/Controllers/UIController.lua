@@ -24,6 +24,8 @@ local INVALID_ASSET_ID = "rbxassetid://0"
 local MIN_FADE_RANGE = 0.01
 local AUTO_ROLL_DELAY_SECONDS = 1.5
 local ROLL_DEBUG_PREFIX = "[RollDebug]"
+local RUNTIME_ROLLING_SLOT_NAME_PATTERN = "^RollingSlot%d+$"
+local ROLL_SPIN_DEBUG_STEP_INTERVAL = 1
 
 local function setText(instance, text)
     if instance and instance:IsA("TextLabel") then
@@ -540,7 +542,7 @@ function UIController:_setupRollingUI()
 
     self._rollingMain = rollingMain
     for _, child in ipairs(self._rollingMain.Parent:GetChildren()) do
-        if child ~= self._rollingMain and child:IsA("GuiObject") and child.Name:match("^RollingSlot%d+$") then
+        if child ~= self._rollingMain and child:IsA("GuiObject") and child.Name:match(RUNTIME_ROLLING_SLOT_NAME_PATTERN) then
             child:Destroy()
         end
     end
@@ -1224,6 +1226,7 @@ function UIController:PlayRollResult(result)
         local fractionalStep = distance - wholeSteps
         local baseIndex = wholeSteps + 1
         local shouldLogStep = wholeSteps ~= lastLoggedWholeSteps
+            and (wholeSteps % ROLL_SPIN_DEBUG_STEP_INTERVAL == 0 or progress >= 1)
         local slotSnapshots = shouldLogStep and {} or nil
 
         for slotIndex, slot in ipairs(self._rollingSlots) do
