@@ -124,6 +124,7 @@ function UIController.new(remotes, notifier)
     self._autoRollThread = nil
     self._autoRollEnabled = false
     self._autoRollThreadToken = 0
+    self._autoRollLoopRunning = false
     self._random = Random.new()
     self._player = Players.LocalPlayer
     self._playerGui = self._player:WaitForChild("PlayerGui")
@@ -992,7 +993,7 @@ function UIController:_updateAutoRollState(snapshot)
     self:_updateRewardsPanelLayout(snapshot)
     self:_updateRollingLayout(snapshot)
 
-    local shouldEnableAutoRoll = snapshot.Stats and snapshot.Stats.AutoRoll == true
+    local shouldEnableAutoRoll = snapshot.Stats and snapshot.Stats.AutoRoll
     if shouldEnableAutoRoll ~= self._autoRollEnabled then
         self._autoRollEnabled = shouldEnableAutoRoll
         self._autoRollThreadToken += 1
@@ -1004,11 +1005,12 @@ function UIController:_updateAutoRollState(snapshot)
         return
     end
 
-    if self._autoRollThread and coroutine.status(self._autoRollThread) ~= "dead" then
+    if self._autoRollLoopRunning then
         return
     end
 
     local token = self._autoRollThreadToken
+    self._autoRollLoopRunning = true
     self._autoRollThread = task.spawn(function()
         self:_debugLog("Auto-roll loop started.")
         while self._autoRollEnabled and token == self._autoRollThreadToken do
@@ -1018,6 +1020,8 @@ function UIController:_updateAutoRollState(snapshot)
             task.wait(1.5)
         end
         self:_debugLog("Auto-roll loop ended.")
+        self._autoRollLoopRunning = false
+        self._autoRollThread = nil
     end)
 end
 
