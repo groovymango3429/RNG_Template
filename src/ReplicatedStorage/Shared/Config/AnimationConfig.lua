@@ -7,7 +7,8 @@ return {
     RollSlotCount = 5,
     RollCenterSlot = 2,
     RollSpinDuration = 2.1,
-    RollSlotPaddingPixels = 20,
+    -- Intentionally large spacing between visible roll slots.
+    RollSlotPaddingPixels = 240,
     RollFadeStartDistance = 1.3,
     RollFadeEndDistance = 2.6,
     RollRevealStartScale = 0.92,
