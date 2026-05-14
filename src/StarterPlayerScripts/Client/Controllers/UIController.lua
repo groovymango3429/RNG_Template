@@ -23,11 +23,8 @@ UIController.__index = UIController
 local INVALID_ASSET_ID = "rbxassetid://0"
 local MIN_FADE_RANGE = 0.01
 local AUTO_ROLL_DELAY_SECONDS = 1.5
-local ROLL_DEBUG_PREFIX = "[RollDebug]"
 -- Runtime-generated rolling frames use this name pattern and are cleaned on setup.
 local RUNTIME_ROLLING_SLOT_NAME_PATTERN = "^RollingSlot%d+$"
--- Emit spin diagnostics once every N whole animation steps.
-local ROLL_SPIN_DEBUG_STEP_INTERVAL = 2
 
 local function setText(instance, text)
     if instance and instance:IsA("TextLabel") then
@@ -119,19 +116,6 @@ local function getRarityColor(rarityName)
     return rarity and rarity.Color or Color3.fromRGB(255, 255, 255)
 end
 
-local function formatUDim2(value)
-    return string.format(
-        "UDim2(%.3f,%d,%.3f,%d)",
-        value.X.Scale,
-        value.X.Offset,
-        value.Y.Scale,
-        value.Y.Offset
-    )
-end
-
-local function formatVector2(value)
-    return string.format("Vector2(%.3f,%.3f)", value.X, value.Y)
-end
 
 function UIController.new(remotes, notifier)
     local self = setmetatable({}, UIController)
@@ -184,37 +168,12 @@ function UIController.new(remotes, notifier)
     return self
 end
 
-function UIController:_debugLog(message, ...)
-    print(string.format("%s " .. message, ROLL_DEBUG_PREFIX, ...))
-end
 
-function UIController:_debugWarn(message, ...)
-    warn(string.format("%s " .. message, ROLL_DEBUG_PREFIX, ...))
-end
-
-function UIController:_describeRollItem(item)
-    local resolved = self:_resolveRollItem(item) or item
-    if type(resolved) ~= "table" then
-        return "UnknownPet(Id=?)"
-    end
-
-    local name = tostring(resolved.DisplayName or resolved.Name or "UnknownPet")
-    local id = tostring(resolved.Id or "?")
-    return string.format("%s(Id=%s)", name, id)
-end
 
 function UIController:_getCenterSlotIndex()
     local configured = math.round(AnimationConfig.RollCenterSlot or 1)
     local slotCount = AnimationConfig.RollSlotCount
     local clamped = math.clamp(configured, 1, math.max(slotCount, 1))
-    if clamped ~= configured then
-        self:_debugWarn(
-            "RollCenterSlot clamped from %d to %d (slotCount=%d).",
-            configured,
-            clamped,
-            slotCount
-        )
-    end
     return clamped
 end
 
@@ -247,11 +206,6 @@ function UIController:_rollItemsMatch(leftItem, rightItem)
         return leftId == rightId
     end
 
-    self:_debugWarn(
-        "Roll item match fallback without stable IDs (left=%s right=%s).",
-        self:_describeRollItem(leftResolved),
-        self:_describeRollItem(rightResolved)
-    )
     return false
 end
 
@@ -316,7 +270,6 @@ function UIController:_invoke(remoteName, ...)
         return remote:InvokeServer(table.unpack(args, 1, args.n))
     end)
     if not success then
-        self:_debugWarn("Roll blocked/failed: remote invoke failed for %s.", tostring(remoteName))
         self._notifier:Show({ Kind = "Error", Message = string.format("Remote %s failed.", remoteName) })
         return nil
     end
@@ -334,7 +287,6 @@ function UIController:_bindActions()
     local autoRollButton = self._ui and SafeWait.FindPath(self._ui, UIConfig.ActionButtons.AutoRoll)
     if autoRollButton and autoRollButton:IsA("GuiButton") then
         self._trove:Connect(autoRollButton.Activated, function()
-            self:_debugLog("Auto-roll toggle requested.")
             local result = self:_invoke("ToggleAutoRoll")
             if result and not result.Success and result.Message then
                 self._notifier:Show({ Kind = "Warning", Message = result.Message })
@@ -382,7 +334,6 @@ function UIController:_bindCloseButtons()
                 local panel = self._panels[panelName]
                 if panel then
                     panel.Visible = false
-                    self:_debugLog("GUI panel closed: %s", panelName)
                 end
             end)
         end
@@ -426,23 +377,19 @@ end
 function UIController:RequestRoll(source)
     local rollSource = source or "Manual"
     if self._rollBusy then
-        self:_debugWarn("Roll blocked (%s): roll already in progress.", rollSource)
         return
     end
 
-    self:_debugLog("Roll started (%s).", rollSource)
     self._rollBusy = true
 
     local success, err = xpcall(function()
         local result = self:_invoke("RollRequest")
         if not result then
-            self:_debugWarn("Roll failed (%s): RollRequest returned nil.", rollSource)
             self:_resetRollingUI("roll failed")
             return
         end
 
         if not result.Success then
-            self:_debugWarn("Roll blocked/failed (%s): %s", rollSource, tostring(result.Message or "Unknown roll failure."))
             if result.Message then
                 self._notifier:Show({ Kind = "Warning", Message = result.Message })
             end
@@ -451,7 +398,6 @@ function UIController:RequestRoll(source)
         end
 
         if not result.Result or not result.Result.Item then
-            self:_debugWarn("Roll failed (%s): server response missing result item.", rollSource)
             self:_resetRollingUI("missing result item")
             return
         end
@@ -460,7 +406,6 @@ function UIController:RequestRoll(source)
     end, debug.traceback)
 
     if not success then
-        self:_debugWarn("Roll failed (%s): %s", rollSource, tostring(err))
         self:_resetRollingUI("roll runtime error")
     end
 
@@ -541,8 +486,6 @@ function UIController:_resetRollingUI(reason)
         slot.Position = self._rollingFinalPosition
         self:_applyRollingTransparency(slot, 0)
     end
-
-    self:_debugLog("Rolling GUI reset/closed (%s).", reason or "unspecified")
 end
 
 function UIController:_setupRollingUI()
@@ -564,14 +507,6 @@ function UIController:_setupRollingUI()
     self._rollingMain.Position = self._rollingFinalPosition
     self._rollingMain.Visible = false
     setPanelVisible(rollingGui, true)
-    self:_debugLog(
-        "Rolling main setup: anchor=%s position=%s size=%s absPos=%s absSize=%s",
-        formatVector2(self._rollingMain.AnchorPoint),
-        formatUDim2(self._rollingMain.Position),
-        formatUDim2(self._rollingMain.Size),
-        formatVector2(self._rollingMain.AbsolutePosition),
-        formatVector2(self._rollingMain.AbsoluteSize)
-    )
     self:_ensureRollingSlots()
 end
 
@@ -611,15 +546,6 @@ function UIController:_ensureRollingSlots()
             RarityStroke = SafeWait.FindPath(slot, UIConfig.Rolling.RarityStrokePath, true),
         }
         self._rollingTransparencyBaseline[slot] = self:_captureTransparencyBaseline(slot)
-        self:_debugLog(
-            "Rolling slot ready: idx=%d name=%s anchor=%s position=%s absPos=%s absSize=%s",
-            index,
-            slot.Name,
-            formatVector2(slot.AnchorPoint),
-            formatUDim2(slot.Position),
-            formatVector2(slot.AbsolutePosition),
-            formatVector2(slot.AbsoluteSize)
-        )
     end
 
     return true
@@ -879,15 +805,13 @@ function UIController:_buildRollSequence(resultItem, centerSlotIndex)
 
     local finalIndex = previewSteps + centerSlotIndex
     sequence[finalIndex] = resolvedResultItem
-    self:_debugLog(
-        "Roll sequence built: slotCount=%d centerSlot=%d previewSteps=%d finalIndex=%d totalEntries=%d reward=%s",
-        AnimationConfig.RollSlotCount,
-        centerSlotIndex,
-        previewSteps,
-        finalIndex,
-        totalEntries,
-        self:_describeRollItem(resolvedResultItem)
-    )
+
+    -- Also place the reward two steps earlier so the slot arriving at center
+    -- during the deceleration phase (slot centerSlotIndex-1) shows the correct pet.
+    local arrivingIndex = finalIndex - 2
+    if arrivingIndex >= 1 then
+        sequence[arrivingIndex] = resolvedResultItem
+    end
 
     return sequence, previewSteps, finalIndex
 end
@@ -1133,7 +1057,6 @@ function UIController:_updateAutoRollState(snapshot)
         self._autoRollEnabled = shouldEnableAutoRoll
         self._autoRollThreadToken += 1
         self:_resetRollingUI(shouldEnableAutoRoll and "auto-roll enabled" or "auto-roll disabled")
-        self:_debugLog("Auto-roll %s.", shouldEnableAutoRoll and "enabled" or "disabled")
     end
 
     if not self._autoRollEnabled then
