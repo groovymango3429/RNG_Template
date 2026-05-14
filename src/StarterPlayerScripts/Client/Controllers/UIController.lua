@@ -115,6 +115,20 @@ local function getRarityColor(rarityName)
     return rarity and rarity.Color or Color3.fromRGB(255, 255, 255)
 end
 
+local function formatUDim2(value)
+    return string.format(
+        "UDim2(%.3f,%d,%.3f,%d)",
+        value.X.Scale,
+        value.X.Offset,
+        value.Y.Scale,
+        value.Y.Offset
+    )
+end
+
+local function formatVector2(value)
+    return string.format("Vector2(%.3f,%.3f)", value.X, value.Y)
+end
+
 function UIController.new(remotes, notifier)
     local self = setmetatable({}, UIController)
     self._trove = Trove.new()
@@ -183,6 +197,21 @@ function UIController:_describeRollItem(item)
     local name = tostring(resolved.DisplayName or resolved.Name or "UnknownPet")
     local id = tostring(resolved.Id or "?")
     return string.format("%s(Id=%s)", name, id)
+end
+
+function UIController:_getCenterSlotIndex()
+    local configured = math.floor((AnimationConfig.RollCenterSlot or 1) + 0.5)
+    local slotCount = #self._rollingSlots > 0 and #self._rollingSlots or AnimationConfig.RollSlotCount
+    local clamped = math.clamp(configured, 1, math.max(slotCount, 1))
+    if clamped ~= configured then
+        self:_debugWarn(
+            "RollCenterSlot clamped from %d to %d (slotCount=%d).",
+            configured,
+            clamped,
+            slotCount
+        )
+    end
+    return clamped
 end
 
 function UIController:_rollItemsMatch(leftItem, rightItem)
@@ -510,10 +539,23 @@ function UIController:_setupRollingUI()
     end
 
     self._rollingMain = rollingMain
+    for _, child in ipairs(self._rollingMain.Parent:GetChildren()) do
+        if child ~= self._rollingMain and child:IsA("GuiObject") and child.Name:match("^RollingSlot%d+$") then
+            child:Destroy()
+        end
+    end
     self._rollingMain.AnchorPoint = self._rollingAnchorPoint
     self._rollingMain.Position = self._rollingFinalPosition
     self._rollingMain.Visible = false
     setPanelVisible(rollingGui, true)
+    self:_debugLog(
+        "Rolling main setup: anchor=%s position=%s size=%s absPos=%s absSize=%s",
+        formatVector2(self._rollingMain.AnchorPoint),
+        formatUDim2(self._rollingMain.Position),
+        formatUDim2(self._rollingMain.Size),
+        formatVector2(self._rollingMain.AbsolutePosition),
+        formatVector2(self._rollingMain.AbsoluteSize)
+    )
     self:_ensureRollingSlots()
 end
 
@@ -552,6 +594,15 @@ function UIController:_ensureRollingSlots()
             RarityStroke = SafeWait.FindPath(slot, UIConfig.Rolling.RarityStrokePath, true),
         }
         self._rollingTransparencyBaseline[slot] = self:_captureTransparencyBaseline(slot)
+        self:_debugLog(
+            "Rolling slot ready: idx=%d name=%s anchor=%s position=%s absPos=%s absSize=%s",
+            index,
+            slot.Name,
+            formatVector2(slot.AnchorPoint),
+            formatUDim2(slot.Position),
+            formatVector2(slot.AbsolutePosition),
+            formatVector2(slot.AbsoluteSize)
+        )
     end
 
     return true
@@ -809,8 +860,18 @@ function UIController:_buildRollSequence(resultItem)
         previousId = candidate and candidate.Id or nil
     end
 
-    local finalIndex = previewSteps + AnimationConfig.RollCenterSlot
+    local centerSlotIndex = self:_getCenterSlotIndex()
+    local finalIndex = previewSteps + centerSlotIndex
     sequence[finalIndex] = resolvedResultItem
+    self:_debugLog(
+        "Roll sequence built: slotCount=%d centerSlot=%d previewSteps=%d finalIndex=%d totalEntries=%d reward=%s",
+        AnimationConfig.RollSlotCount,
+        centerSlotIndex,
+        previewSteps,
+        finalIndex,
+        totalEntries,
+        self:_describeRollItem(resolvedResultItem)
+    )
 
     return sequence, previewSteps
 end
@@ -1121,7 +1182,8 @@ function UIController:PlayRollResult(result)
     self._rollAnimationToken += 1
     local token = self._rollAnimationToken
     local sequence, previewSteps = self:_buildRollSequence(resolvedResultItem)
-    local centerSequenceIndex = previewSteps + AnimationConfig.RollCenterSlot
+    local centerSlotIndex = self:_getCenterSlotIndex()
+    local centerSequenceIndex = previewSteps + centerSlotIndex
     local middleSequenceItem = sequence[centerSequenceIndex] or resolvedResultItem
     if not self:_rollItemsMatch(middleSequenceItem, resolvedResultItem) then
         self:_debugWarn(
@@ -1141,9 +1203,19 @@ function UIController:PlayRollResult(result)
     local fadeRange = math.max(AnimationConfig.RollFadeEndDistance - fadeStartDistance, MIN_FADE_RANGE)
     local slotSpacingPixels = self:_getRollingSlotSpacingPixels()
     local maxAutoRollPositionOffset = self:_getAutoRollMaxYOffsetPixels()
+    self:_debugLog(
+        "Roll animation config: slotCount=%d centerSlot=%d slotSpacing=%.2f padding=%d horizontal=%s basePos=%s",
+        AnimationConfig.RollSlotCount,
+        centerSlotIndex,
+        slotSpacingPixels,
+        AnimationConfig.RollSlotPaddingPixels,
+        tostring(self._rollingIsHorizontal),
+        formatUDim2(self._rollingFinalPosition)
+    )
 
     self:_hideRollingSlots()
     local startedAt = os.clock()
+    local lastLoggedWholeSteps = -1
     while token == self._rollAnimationToken do
         local progress = math.clamp((os.clock() - startedAt) / AnimationConfig.RollSpinDuration, 0, 1)
         local eased = TweenService:GetValue(progress, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
@@ -1154,15 +1226,27 @@ function UIController:PlayRollResult(result)
 
         for slotIndex, slot in ipairs(self._rollingSlots) do
             local item = sequence[baseIndex + slotIndex - 1] or resolvedResultItem
-            local slotDistanceFromCenter = math.abs((slotIndex - AnimationConfig.RollCenterSlot) + fractionalStep)
-            local positionOffset = ((slotIndex - AnimationConfig.RollCenterSlot) + fractionalStep) * slotSpacingPixels
+            local slotDistanceFromCenter = math.abs((slotIndex - centerSlotIndex) + fractionalStep)
+            local positionOffset = ((slotIndex - centerSlotIndex) + fractionalStep) * slotSpacingPixels
             positionOffset = math.min(positionOffset, maxAutoRollPositionOffset)
             local alpha = 0
             if slotDistanceFromCenter >= fadeStartDistance then
                 alpha = math.clamp((slotDistanceFromCenter - fadeStartDistance) / fadeRange, 0, 1)
             end
+            if wholeSteps ~= lastLoggedWholeSteps then
+                self:_debugLog(
+                    "Spin step=%d slot=%d item=%s offset=%.2f alpha=%.2f absPos=%s",
+                    wholeSteps,
+                    slotIndex,
+                    self:_describeRollItem(item),
+                    positionOffset,
+                    alpha,
+                    formatVector2(slot.AbsolutePosition)
+                )
+            end
             self:_setRollingSlotState(slot, item, positionOffset, alpha)
         end
+        lastLoggedWholeSteps = wholeSteps
 
         if progress >= 1 then
             break
@@ -1175,14 +1259,20 @@ function UIController:PlayRollResult(result)
         return
     end
 
-    local winningSlot = self._rollingSlots[AnimationConfig.RollCenterSlot]
+    local winningSlot = self._rollingSlots[centerSlotIndex]
     for slotIndex, slot in ipairs(self._rollingSlots) do
-        if slotIndex == AnimationConfig.RollCenterSlot then
+        if slotIndex == centerSlotIndex then
             self:_setRollingSlotState(slot, resolvedResultItem, 0, 0)
         else
             slot.Visible = false
         end
     end
+    self:_debugLog(
+        "Winning slot reveal: centerSlot=%d reward=%s winningSlotAbsPos=%s",
+        centerSlotIndex,
+        self:_describeRollItem(resolvedResultItem),
+        winningSlot and formatVector2(winningSlot.AbsolutePosition) or "nil"
+    )
 
     if winningSlot then
         self:_playWinningReveal(winningSlot, resolvedResultItem, token)
