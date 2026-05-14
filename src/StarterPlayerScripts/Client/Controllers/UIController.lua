@@ -1000,7 +1000,7 @@ function UIController:_updateAutoRollState(snapshot)
     self:_updateRewardsPanelLayout(snapshot)
     self:_updateRollingLayout(snapshot)
 
-    local shouldEnableAutoRoll = snapshot.Stats and snapshot.Stats.AutoRoll
+    local shouldEnableAutoRoll = snapshot.Stats and snapshot.Stats.AutoRoll == true
     if shouldEnableAutoRoll ~= self._autoRollEnabled then
         self._autoRollEnabled = shouldEnableAutoRoll
         self._autoRollThreadToken += 1
@@ -1070,15 +1070,15 @@ function UIController:PlayRollResult(result)
     self._rollAnimationToken += 1
     local token = self._rollAnimationToken
     local sequence, previewSteps = self:_buildRollSequence(resolvedResultItem)
-    local finalSequenceIndex = previewSteps + AnimationConfig.RollCenterSlot
-    local middleSequenceItem = sequence[finalSequenceIndex] or resolvedResultItem
+    local centerSequenceIndex = previewSteps + AnimationConfig.RollCenterSlot
+    local middleSequenceItem = sequence[centerSequenceIndex] or resolvedResultItem
     if not self:_rollItemsMatch(middleSequenceItem, resolvedResultItem) then
         self:_debugWarn(
             "ERROR: animation middle pet (%s) does not match rewarded pet (%s).",
             self:_describeRollItem(middleSequenceItem),
             self:_describeRollItem(resolvedResultItem)
         )
-        sequence[finalSequenceIndex] = resolvedResultItem
+        sequence[centerSequenceIndex] = resolvedResultItem
         middleSequenceItem = resolvedResultItem
     end
     self:_debugLog("Middle animation pet: %s", self:_describeRollItem(middleSequenceItem))
