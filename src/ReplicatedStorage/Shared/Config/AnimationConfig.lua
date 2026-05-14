@@ -7,7 +7,7 @@ return {
     RollSlotCount = 5,
     RollCenterSlot = 2,
     RollSpinDuration = 2.1,
-    -- Intentionally large spacing for wider roll lane separation.
+    -- Intentionally large spacing between visible roll slots.
     RollSlotPaddingPixels = 240,
     RollFadeStartDistance = 1.3,
     RollFadeEndDistance = 2.6,

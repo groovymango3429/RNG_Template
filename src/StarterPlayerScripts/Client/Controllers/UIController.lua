@@ -24,7 +24,9 @@ local INVALID_ASSET_ID = "rbxassetid://0"
 local MIN_FADE_RANGE = 0.01
 local AUTO_ROLL_DELAY_SECONDS = 1.5
 local ROLL_DEBUG_PREFIX = "[RollDebug]"
+-- Runtime-generated rolling frames use this name pattern and are cleaned on setup.
 local RUNTIME_ROLLING_SLOT_NAME_PATTERN = "^RollingSlot%d+$"
+-- Emit spin diagnostics once every N whole animation steps.
 local ROLL_SPIN_DEBUG_STEP_INTERVAL = 1
 
 local function setText(instance, text)
