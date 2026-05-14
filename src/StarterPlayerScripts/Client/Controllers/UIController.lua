@@ -1128,9 +1128,7 @@ function UIController:PlayRollResult(result)
             local item = sequence[baseIndex + slotIndex - 1] or resolvedResultItem
             local slotDistanceFromCenter = math.abs((slotIndex - AnimationConfig.RollCenterSlot) + fractionalStep)
             local yOffset = ((slotIndex - AnimationConfig.RollCenterSlot) + fractionalStep) * slotSpacingPixels
-            if yOffset > maxAutoRollYOffset then
-                yOffset = maxAutoRollYOffset
-            end
+            yOffset = math.min(yOffset, maxAutoRollYOffset)
             local alpha = 0
             if slotDistanceFromCenter >= fadeStartDistance then
                 alpha = math.clamp((slotDistanceFromCenter - fadeStartDistance) / fadeRange, 0, 1)
