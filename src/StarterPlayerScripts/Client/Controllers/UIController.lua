@@ -202,7 +202,7 @@ function UIController:_describeRollItem(item)
 end
 
 function UIController:_getCenterSlotIndex()
-    local configured = math.floor((AnimationConfig.RollCenterSlot or 1) + 0.5)
+    local configured = math.round(AnimationConfig.RollCenterSlot or 1)
     local slotCount = #self._rollingSlots > 0 and #self._rollingSlots or AnimationConfig.RollSlotCount
     local clamped = math.clamp(configured, 1, math.max(slotCount, 1))
     if clamped ~= configured then
@@ -214,6 +214,18 @@ function UIController:_getCenterSlotIndex()
         )
     end
     return clamped
+end
+
+function UIController:_clearStaleRollingSlots()
+    if not self._rollingMain or not self._rollingMain.Parent then
+        return
+    end
+
+    for _, child in ipairs(self._rollingMain.Parent:GetChildren()) do
+        if child ~= self._rollingMain and child:IsA("GuiObject") and child.Name:match(RUNTIME_ROLLING_SLOT_NAME_PATTERN) then
+            child:Destroy()
+        end
+    end
 end
 
 function UIController:_rollItemsMatch(leftItem, rightItem)
@@ -541,11 +553,7 @@ function UIController:_setupRollingUI()
     end
 
     self._rollingMain = rollingMain
-    for _, child in ipairs(self._rollingMain.Parent:GetChildren()) do
-        if child ~= self._rollingMain and child:IsA("GuiObject") and child.Name:match(RUNTIME_ROLLING_SLOT_NAME_PATTERN) then
-            child:Destroy()
-        end
-    end
+    self:_clearStaleRollingSlots()
     self._rollingMain.AnchorPoint = self._rollingAnchorPoint
     self._rollingMain.Position = self._rollingFinalPosition
     self._rollingMain.Visible = false
@@ -1226,7 +1234,7 @@ function UIController:PlayRollResult(result)
         local fractionalStep = distance - wholeSteps
         local baseIndex = wholeSteps + 1
         local shouldLogStep = wholeSteps ~= lastLoggedWholeSteps
-            and (wholeSteps % ROLL_SPIN_DEBUG_STEP_INTERVAL == 0 or progress >= 1)
+            and ((wholeSteps % ROLL_SPIN_DEBUG_STEP_INTERVAL == 0) or progress >= 1)
         local slotSnapshots = shouldLogStep and {} or nil
 
         for slotIndex, slot in ipairs(self._rollingSlots) do
