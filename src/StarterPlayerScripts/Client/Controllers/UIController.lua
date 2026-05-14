@@ -147,6 +147,7 @@ function UIController.new(remotes, notifier)
     self._rollingAnchorPoint = self._rollingBaseAnchorPoint
     self._rollingScaleMultiplier = 1
     self._rollingSpacingMultiplier = 1
+    self._rollingIsHorizontal = false
     self._rollAnimationToken = 0
     self._preloadedRollImages = {}
 
@@ -604,6 +605,18 @@ function UIController:_getRollingSlotSpacingPixels()
         return 120 + AnimationConfig.RollSlotPaddingPixels
     end
 
+    if self._rollingIsHorizontal then
+        local slotWidth = baseSlot.AbsoluteSize.X
+        if slotWidth <= 0 then
+            local viewportWidth = self._rollingGui and self._rollingGui.AbsoluteSize.X or 0
+            slotWidth = (baseSlot.Size.X.Scale * viewportWidth) + baseSlot.Size.X.Offset
+        end
+        if slotWidth <= 0 then
+            slotWidth = 120
+        end
+        return (slotWidth + AnimationConfig.RollSlotPaddingPixels) * self._rollingSpacingMultiplier
+    end
+
     local slotHeight = baseSlot.AbsoluteSize.Y
     if slotHeight <= 0 then
         local viewportHeight = self._rollingGui and self._rollingGui.AbsoluteSize.Y or 0
@@ -618,6 +631,10 @@ end
 
 function UIController:_getAutoRollMaxYOffsetPixels()
     if not self._autoRollEnabled then
+        return math.huge
+    end
+
+    if self._rollingIsHorizontal then
         return math.huge
     end
 
@@ -658,14 +675,23 @@ function UIController:_setRollingSlotContent(slot, item)
     end
 end
 
-function UIController:_setRollingSlotState(slot, item, yOffset, alpha)
+function UIController:_setRollingSlotState(slot, item, positionOffset, alpha)
     slot.AnchorPoint = self._rollingAnchorPoint
-    slot.Position = UDim2.new(
-        self._rollingFinalPosition.X.Scale,
-        self._rollingFinalPosition.X.Offset,
-        self._rollingFinalPosition.Y.Scale,
-        self._rollingFinalPosition.Y.Offset + math.floor(yOffset)
-    )
+    if self._rollingIsHorizontal then
+        slot.Position = UDim2.new(
+            self._rollingFinalPosition.X.Scale,
+            self._rollingFinalPosition.X.Offset + math.floor(positionOffset),
+            self._rollingFinalPosition.Y.Scale,
+            self._rollingFinalPosition.Y.Offset
+        )
+    else
+        slot.Position = UDim2.new(
+            self._rollingFinalPosition.X.Scale,
+            self._rollingFinalPosition.X.Offset,
+            self._rollingFinalPosition.Y.Scale,
+            self._rollingFinalPosition.Y.Offset + math.floor(positionOffset)
+        )
+    end
     slot.Visible = true
     self:_setRollingSlotContent(slot, item)
     self:_applyRollingTransparency(slot, alpha)
@@ -1011,11 +1037,13 @@ function UIController:_updateRollingLayout(snapshot)
         self._rollingFinalPosition = UIConfig.AutoRoll.RollingPanelTopPosition or self._rollingBaseFinalPosition
         self._rollingScaleMultiplier = UIConfig.AutoRoll.RollingScale or 1
         self._rollingSpacingMultiplier = UIConfig.AutoRoll.RollingSpacingScale or 1
+        self._rollingIsHorizontal = UIConfig.AutoRoll.IsHorizontal == true
     else
         self._rollingAnchorPoint = self._rollingBaseAnchorPoint
         self._rollingFinalPosition = self._rollingBaseFinalPosition
         self._rollingScaleMultiplier = 1
         self._rollingSpacingMultiplier = 1
+        self._rollingIsHorizontal = false
     end
 end
 
@@ -1112,7 +1140,7 @@ function UIController:PlayRollResult(result)
     local fadeStartDistance = AnimationConfig.RollFadeStartDistance
     local fadeRange = math.max(AnimationConfig.RollFadeEndDistance - fadeStartDistance, MIN_FADE_RANGE)
     local slotSpacingPixels = self:_getRollingSlotSpacingPixels()
-    local maxAutoRollYOffset = self:_getAutoRollMaxYOffsetPixels()
+    local maxAutoRollPositionOffset = self:_getAutoRollMaxYOffsetPixels()
 
     self:_hideRollingSlots()
     local startedAt = os.clock()
@@ -1127,13 +1155,13 @@ function UIController:PlayRollResult(result)
         for slotIndex, slot in ipairs(self._rollingSlots) do
             local item = sequence[baseIndex + slotIndex - 1] or resolvedResultItem
             local slotDistanceFromCenter = math.abs((slotIndex - AnimationConfig.RollCenterSlot) + fractionalStep)
-            local yOffset = ((slotIndex - AnimationConfig.RollCenterSlot) + fractionalStep) * slotSpacingPixels
-            yOffset = math.min(yOffset, maxAutoRollYOffset)
+            local positionOffset = ((slotIndex - AnimationConfig.RollCenterSlot) + fractionalStep) * slotSpacingPixels
+            positionOffset = math.min(positionOffset, maxAutoRollPositionOffset)
             local alpha = 0
             if slotDistanceFromCenter >= fadeStartDistance then
                 alpha = math.clamp((slotDistanceFromCenter - fadeStartDistance) / fadeRange, 0, 1)
             end
-            self:_setRollingSlotState(slot, item, yOffset, alpha)
+            self:_setRollingSlotState(slot, item, positionOffset, alpha)
         end
 
         if progress >= 1 then
