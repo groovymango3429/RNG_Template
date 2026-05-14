@@ -1,4 +1,6 @@
 --!strict
+local MAX_ANIMATION_Y_SCALE_RATIO = 1 / 3
+
 return {
     RootGui = "YourUiPack!",
     Panels = {
@@ -64,6 +66,6 @@ return {
         RollingPanelTopAnchorPoint = Vector2.new(0.5, 0),
         RollingScale = 0.5,
         RollingSpacingScale = 0.42,
-        MaxAnimationYScale = 1 / 3,
+        MaxAnimationYScale = MAX_ANIMATION_Y_SCALE_RATIO,
     },
 }
