@@ -22,6 +22,8 @@ UIController.__index = UIController
 
 local INVALID_ASSET_ID = "rbxassetid://0"
 local MIN_FADE_RANGE = 0.01
+local AUTO_ROLL_DELAY_SECONDS = 1.5
+local ROLL_DEBUG_PREFIX = "[RollDebug]"
 
 local function setText(instance, text)
     if instance and instance:IsA("TextLabel") then
@@ -121,6 +123,9 @@ function UIController.new(remotes, notifier)
     self._snapshot = nil
     self._rollBusy = false
     self._autoRollThread = nil
+    self._autoRollEnabled = false
+    self._autoRollThreadToken = 0
+    self._autoRollLoopRunning = false
     self._random = Random.new()
     self._player = Players.LocalPlayer
     self._playerGui = self._player:WaitForChild("PlayerGui")
@@ -160,9 +165,52 @@ function UIController.new(remotes, notifier)
     return self
 end
 
+function UIController:_debugLog(message, ...)
+    print(string.format("%s " .. message, ROLL_DEBUG_PREFIX, ...))
+end
+
+function UIController:_debugWarn(message, ...)
+    warn(string.format("%s " .. message, ROLL_DEBUG_PREFIX, ...))
+end
+
+function UIController:_describeRollItem(item)
+    local resolved = self:_resolveRollItem(item) or item
+    if type(resolved) ~= "table" then
+        return "UnknownPet(Id=?)"
+    end
+
+    local name = tostring(resolved.DisplayName or resolved.Name or "UnknownPet")
+    local id = tostring(resolved.Id or "?")
+    return string.format("%s(Id=%s)", name, id)
+end
+
+function UIController:_rollItemsMatch(leftItem, rightItem)
+    local leftResolved = self:_resolveRollItem(leftItem) or leftItem
+    local rightResolved = self:_resolveRollItem(rightItem) or rightItem
+    if type(leftResolved) ~= "table" or type(rightResolved) ~= "table" then
+        return false
+    end
+
+    local leftId = leftResolved.Id
+    local rightId = rightResolved.Id
+    if leftId ~= nil and rightId ~= nil then
+        return leftId == rightId
+    end
+
+    self:_debugWarn(
+        "Roll item match fallback without stable IDs (left=%s right=%s).",
+        self:_describeRollItem(leftResolved),
+        self:_describeRollItem(rightResolved)
+    )
+    return false
+end
+
 function UIController:Destroy()
+    self._rollBusy = false
+    self._autoRollEnabled = false
+    self._autoRollThreadToken += 1
     self._rollAnimationToken += 1
-    self:_hideRollingSlots()
+    self:_resetRollingUI("controller destroy")
     self._trove:Destroy()
 end
 
@@ -218,6 +266,7 @@ function UIController:_invoke(remoteName, ...)
         return remote:InvokeServer(table.unpack(args, 1, args.n))
     end)
     if not success then
+        self:_debugWarn("Roll blocked/failed: remote invoke failed for %s.", tostring(remoteName))
         self._notifier:Show({ Kind = "Error", Message = string.format("Remote %s failed.", remoteName) })
         return nil
     end
@@ -235,6 +284,7 @@ function UIController:_bindActions()
     local autoRollButton = self._ui and SafeWait.FindPath(self._ui, UIConfig.ActionButtons.AutoRoll)
     if autoRollButton and autoRollButton:IsA("GuiButton") then
         self._trove:Connect(autoRollButton.Activated, function()
+            self:_debugLog("Auto-roll toggle requested.")
             local result = self:_invoke("ToggleAutoRoll")
             if result and not result.Success and result.Message then
                 self._notifier:Show({ Kind = "Warning", Message = result.Message })
@@ -282,6 +332,7 @@ function UIController:_bindCloseButtons()
                 local panel = self._panels[panelName]
                 if panel then
                     panel.Visible = false
+                    self:_debugLog("GUI panel closed: %s", panelName)
                 end
             end)
         end
@@ -322,17 +373,47 @@ function UIController:_bindRewardButtons()
     end
 end
 
-function UIController:RequestRoll()
+function UIController:RequestRoll(source)
+    local rollSource = source or "Manual"
     if self._rollBusy then
+        self:_debugWarn("Roll blocked (%s): roll already in progress.", rollSource)
         return
     end
+
+    self:_debugLog("Roll started (%s).", rollSource)
     self._rollBusy = true
-    local result = self:_invoke("RollRequest")
-    if result and not result.Success and result.Message then
-        self._notifier:Show({ Kind = "Warning", Message = result.Message })
-    elseif result and result.Success and result.Result and result.Result.Item then
+
+    local success, err = xpcall(function()
+        local result = self:_invoke("RollRequest")
+        if not result then
+            self:_debugWarn("Roll failed (%s): RollRequest returned nil.", rollSource)
+            self:_resetRollingUI("roll failed")
+            return
+        end
+
+        if not result.Success then
+            self:_debugWarn("Roll blocked/failed (%s): %s", rollSource, tostring(result.Message or "Unknown roll failure."))
+            if result.Message then
+                self._notifier:Show({ Kind = "Warning", Message = result.Message })
+            end
+            self:_resetRollingUI("roll failed")
+            return
+        end
+
+        if not result.Result or not result.Result.Item then
+            self:_debugWarn("Roll failed (%s): server response missing result item.", rollSource)
+            self:_resetRollingUI("missing result item")
+            return
+        end
+
         self:PlayRollResult(result.Result)
+    end, debug.traceback)
+
+    if not success then
+        self:_debugWarn("Roll failed (%s): %s", rollSource, tostring(err))
+        self:_resetRollingUI("roll runtime error")
     end
+
     self._rollBusy = false
 end
 
@@ -400,6 +481,18 @@ function UIController:_hideRollingSlots()
             uiScale.Scale = self._rollingScaleMultiplier
         end
     end
+end
+
+function UIController:_resetRollingUI(reason)
+    self:_hideRollingSlots()
+
+    for _, slot in ipairs(self._rollingSlots) do
+        slot.AnchorPoint = self._rollingAnchorPoint
+        slot.Position = self._rollingFinalPosition
+        self:_applyRollingTransparency(slot, 0)
+    end
+
+    self:_debugLog("Rolling GUI reset/closed (%s).", reason or "unspecified")
 end
 
 function UIController:_setupRollingUI()
@@ -907,21 +1000,36 @@ function UIController:_updateAutoRollState(snapshot)
     self:_updateRewardsPanelLayout(snapshot)
     self:_updateRollingLayout(snapshot)
 
-    if self._autoRollThread then
-        task.cancel(self._autoRollThread)
-        self._autoRollThread = nil
+    local shouldEnableAutoRoll = snapshot.Stats and snapshot.Stats.AutoRoll == true
+    if shouldEnableAutoRoll ~= self._autoRollEnabled then
+        self._autoRollEnabled = shouldEnableAutoRoll
+        self._autoRollThreadToken += 1
+        self:_resetRollingUI(shouldEnableAutoRoll and "auto-roll enabled" or "auto-roll disabled")
+        self:_debugLog("Auto-roll %s.", shouldEnableAutoRoll and "enabled" or "disabled")
     end
 
-    if snapshot.Stats and snapshot.Stats.AutoRoll then
-        self._autoRollThread = task.spawn(function()
-            while self._snapshot and self._snapshot.Stats and self._snapshot.Stats.AutoRoll do
-                if not self._rollBusy then
-                    self:RequestRoll()
-                end
-                task.wait(1.5)
-            end
-        end)
+    if not self._autoRollEnabled then
+        return
     end
+
+    if self._autoRollLoopRunning then
+        return
+    end
+
+    local token = self._autoRollThreadToken
+    self._autoRollLoopRunning = true
+    self._autoRollThread = task.spawn(function()
+        self:_debugLog("Auto-roll loop started.")
+        while self._autoRollEnabled and token == self._autoRollThreadToken do
+            if not self._rollBusy then
+                self:RequestRoll("AutoRoll")
+            end
+            task.wait(AUTO_ROLL_DELAY_SECONDS)
+        end
+        self:_debugLog("Auto-roll loop ended.")
+        self._autoRollLoopRunning = false
+        self._autoRollThread = nil
+    end)
 end
 
 function UIController:ApplySnapshot(snapshot)
@@ -944,19 +1052,40 @@ end
 
 function UIController:PlayRollResult(result)
     if not result or not result.Item then
+        self:_debugWarn("Roll failed: PlayRollResult called without a valid item.")
+        self:_resetRollingUI("invalid play result")
         return
     end
 
     if not self:_ensureRollingSlots() then
+        self:_debugWarn("Roll blocked: rolling slots are unavailable.")
+        self:_resetRollingUI("rolling slots unavailable")
         return
     end
 
     local resolvedResultItem = self:_resolveRollItem(result.Item) or result.Item
+    self:_debugLog("Reward pet selected: %s", self:_describeRollItem(resolvedResultItem))
     self:_preloadRollImages({ resolvedResultItem })
 
     self._rollAnimationToken += 1
     local token = self._rollAnimationToken
     local sequence, previewSteps = self:_buildRollSequence(resolvedResultItem)
+    local centerSequenceIndex = previewSteps + AnimationConfig.RollCenterSlot
+    local middleSequenceItem = sequence[centerSequenceIndex] or resolvedResultItem
+    if not self:_rollItemsMatch(middleSequenceItem, resolvedResultItem) then
+        self:_debugWarn(
+            "ERROR: animation middle pet (%s) does not match rewarded pet (%s).",
+            self:_describeRollItem(middleSequenceItem),
+            self:_describeRollItem(resolvedResultItem)
+        )
+        sequence[centerSequenceIndex] = resolvedResultItem
+        middleSequenceItem = resolvedResultItem
+    end
+    self:_debugLog("Middle animation pet: %s", self:_describeRollItem(middleSequenceItem))
+    self:_debugLog(
+        "Middle/reward match: %s",
+        self:_rollItemsMatch(middleSequenceItem, resolvedResultItem) and "YES" or "NO"
+    )
     local fadeStartDistance = AnimationConfig.RollFadeStartDistance
     local fadeRange = math.max(AnimationConfig.RollFadeEndDistance - fadeStartDistance, MIN_FADE_RANGE)
     local slotSpacingPixels = self:_getRollingSlotSpacingPixels()
@@ -989,6 +1118,7 @@ function UIController:PlayRollResult(result)
     end
 
     if token ~= self._rollAnimationToken then
+        self:_resetRollingUI("roll animation interrupted before reveal")
         return
     end
 
@@ -1004,6 +1134,14 @@ function UIController:PlayRollResult(result)
     if winningSlot then
         self:_playWinningReveal(winningSlot, resolvedResultItem, token)
     end
+
+    if token ~= self._rollAnimationToken then
+        self:_resetRollingUI("roll animation interrupted after reveal")
+        return
+    end
+
+    self:_debugLog("Roll animation ended.")
+    self:_resetRollingUI("roll animation completed")
 end
 
 return UIController
