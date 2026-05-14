@@ -1223,6 +1223,8 @@ function UIController:PlayRollResult(result)
         local wholeSteps = math.floor(distance)
         local fractionalStep = distance - wholeSteps
         local baseIndex = wholeSteps + 1
+        local shouldLogStep = wholeSteps ~= lastLoggedWholeSteps
+        local slotSnapshots = shouldLogStep and {} or nil
 
         for slotIndex, slot in ipairs(self._rollingSlots) do
             local item = sequence[baseIndex + slotIndex - 1] or resolvedResultItem
@@ -1233,18 +1235,30 @@ function UIController:PlayRollResult(result)
             if slotDistanceFromCenter >= fadeStartDistance then
                 alpha = math.clamp((slotDistanceFromCenter - fadeStartDistance) / fadeRange, 0, 1)
             end
-            if wholeSteps ~= lastLoggedWholeSteps then
-                self:_debugLog(
-                    "Spin step=%d slot=%d item=%s offset=%.2f alpha=%.2f absPos=%s",
-                    wholeSteps,
-                    slotIndex,
-                    self:_describeRollItem(item),
-                    positionOffset,
-                    alpha,
-                    formatVector2(slot.AbsolutePosition)
+            if slotSnapshots then
+                table.insert(
+                    slotSnapshots,
+                    string.format(
+                        "#%d:%s@offset=%.2f,a=%.2f,pos=%s",
+                        slotIndex,
+                        self:_describeRollItem(item),
+                        positionOffset,
+                        alpha,
+                        formatVector2(slot.AbsolutePosition)
+                    )
                 )
             end
             self:_setRollingSlotState(slot, item, positionOffset, alpha)
+        end
+        if slotSnapshots then
+            self:_debugLog(
+                "Spin step=%d progress=%.3f baseIndex=%d centerSeqIndex=%d slots={%s}",
+                wholeSteps,
+                progress,
+                baseIndex,
+                centerSequenceIndex,
+                table.concat(slotSnapshots, " | ")
+            )
         end
         lastLoggedWholeSteps = wholeSteps
 
