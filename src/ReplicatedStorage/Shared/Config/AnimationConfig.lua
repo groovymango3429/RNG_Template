@@ -5,7 +5,7 @@ return {
     RollCycleDelay = 0.08,
     ResultHoldSeconds = 1.25,
     RollSlotCount = 5,
-    RollCenterSlot = 3,
+    RollCenterSlot = 2,
     RollSpinDuration = 2.1,
     RollSlotPaddingPixels = 20,
     RollFadeStartDistance = 1.3,
