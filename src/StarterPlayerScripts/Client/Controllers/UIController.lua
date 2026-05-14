@@ -202,8 +202,7 @@ function UIController:_rollItemsMatch(leftItem, rightItem)
         self:_describeRollItem(leftResolved),
         self:_describeRollItem(rightResolved)
     )
-    return tostring(leftResolved.DisplayName or "") == tostring(rightResolved.DisplayName or "")
-        and tostring(leftResolved.Rarity or "") == tostring(rightResolved.Rarity or "")
+    return false
 end
 
 function UIController:Destroy()
