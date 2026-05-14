@@ -22,6 +22,7 @@ UIController.__index = UIController
 
 local INVALID_ASSET_ID = "rbxassetid://0"
 local MIN_FADE_RANGE = 0.01
+local AUTO_ROLL_DELAY_SECONDS = 1.5
 local ROLL_DEBUG_PREFIX = "[RollDebug]"
 
 local function setText(instance, text)
@@ -165,11 +166,11 @@ function UIController.new(remotes, notifier)
 end
 
 function UIController:_debugLog(message, ...)
-    print(string.format("%s %s", ROLL_DEBUG_PREFIX, string.format(message, ...)))
+    print(string.format("%s " .. message, ROLL_DEBUG_PREFIX, ...))
 end
 
 function UIController:_debugWarn(message, ...)
-    warn(string.format("%s %s", ROLL_DEBUG_PREFIX, string.format(message, ...)))
+    warn(string.format("%s " .. message, ROLL_DEBUG_PREFIX, ...))
 end
 
 function UIController:_describeRollItem(item)
@@ -190,10 +191,17 @@ function UIController:_rollItemsMatch(leftItem, rightItem)
         return false
     end
 
-    if leftResolved.Id ~= nil and rightResolved.Id ~= nil then
-        return leftResolved.Id == rightResolved.Id
+    local leftId = leftResolved.Id
+    local rightId = rightResolved.Id
+    if leftId ~= nil and rightId ~= nil then
+        return leftId == rightId
     end
 
+    self:_debugWarn(
+        "Roll item match fallback without stable IDs (left=%s right=%s).",
+        self:_describeRollItem(leftResolved),
+        self:_describeRollItem(rightResolved)
+    )
     return tostring(leftResolved.DisplayName or "") == tostring(rightResolved.DisplayName or "")
         and tostring(leftResolved.Rarity or "") == tostring(rightResolved.Rarity or "")
 end
@@ -1017,7 +1025,7 @@ function UIController:_updateAutoRollState(snapshot)
             if not self._rollBusy then
                 self:RequestRoll("AutoRoll")
             end
-            task.wait(1.5)
+            task.wait(AUTO_ROLL_DELAY_SECONDS)
         end
         self:_debugLog("Auto-roll loop ended.")
         self._autoRollLoopRunning = false
