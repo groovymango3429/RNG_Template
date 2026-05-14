@@ -616,6 +616,31 @@ function UIController:_getRollingSlotSpacingPixels()
     return (slotHeight + AnimationConfig.RollSlotPaddingPixels) * self._rollingSpacingMultiplier
 end
 
+function UIController:_getAutoRollMaxYOffsetPixels()
+    if not self._autoRollEnabled then
+        return math.huge
+    end
+
+    local maxYScale = UIConfig.AutoRoll and UIConfig.AutoRoll.MaxAnimationYScale
+    if type(maxYScale) ~= "number" then
+        return math.huge
+    end
+
+    local rollingGui = self._rollingGui
+    if not rollingGui then
+        return math.huge
+    end
+
+    local viewportHeight = rollingGui.AbsoluteSize.Y
+    if viewportHeight <= 0 then
+        return math.huge
+    end
+
+    local basePositionPixels = (self._rollingFinalPosition.Y.Scale * viewportHeight) + self._rollingFinalPosition.Y.Offset
+    local maxPositionPixels = maxYScale * viewportHeight
+    return math.max(0, maxPositionPixels - basePositionPixels)
+end
+
 function UIController:_setRollingSlotContent(slot, item)
     local refs = self._rollingSlotRefs[slot]
     if not refs then
@@ -690,10 +715,11 @@ function UIController:_playWinningReveal(slot, item, token)
     end
 
     local fadeDuration = AnimationConfig.RollFadeOutDuration
+    local fadeOutScaleOffset = self._autoRollEnabled and 0 or AnimationConfig.RollFadeOutOffset
     local endPosition = UDim2.new(
         self._rollingFinalPosition.X.Scale,
         self._rollingFinalPosition.X.Offset,
-        self._rollingFinalPosition.Y.Scale + AnimationConfig.RollFadeOutOffset,
+        self._rollingFinalPosition.Y.Scale + fadeOutScaleOffset,
         self._rollingFinalPosition.Y.Offset
     )
     local movementTween = TweenService:Create(
@@ -759,9 +785,6 @@ function UIController:_buildRollSequence(resultItem)
 
     local finalIndex = previewSteps + AnimationConfig.RollCenterSlot
     sequence[finalIndex] = resolvedResultItem
-    for index = finalIndex + 1, totalEntries do
-        sequence[index] = resolvedResultItem
-    end
 
     return sequence, previewSteps
 end
@@ -1089,6 +1112,7 @@ function UIController:PlayRollResult(result)
     local fadeStartDistance = AnimationConfig.RollFadeStartDistance
     local fadeRange = math.max(AnimationConfig.RollFadeEndDistance - fadeStartDistance, MIN_FADE_RANGE)
     local slotSpacingPixels = self:_getRollingSlotSpacingPixels()
+    local maxAutoRollYOffset = self:_getAutoRollMaxYOffsetPixels()
 
     self:_hideRollingSlots()
     local startedAt = os.clock()
@@ -1104,6 +1128,9 @@ function UIController:PlayRollResult(result)
             local item = sequence[baseIndex + slotIndex - 1] or resolvedResultItem
             local slotDistanceFromCenter = math.abs((slotIndex - AnimationConfig.RollCenterSlot) + fractionalStep)
             local yOffset = ((slotIndex - AnimationConfig.RollCenterSlot) + fractionalStep) * slotSpacingPixels
+            if yOffset > maxAutoRollYOffset then
+                yOffset = maxAutoRollYOffset
+            end
             local alpha = 0
             if slotDistanceFromCenter >= fadeStartDistance then
                 alpha = math.clamp((slotDistanceFromCenter - fadeStartDistance) / fadeRange, 0, 1)

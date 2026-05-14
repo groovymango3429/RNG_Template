@@ -60,9 +60,10 @@ return {
     AutoRoll = {
         RollPanelTopPosition = UDim2.new(0.5, 0, 0.08, 0),
         RollPanelTopAnchorPoint = Vector2.new(0.5, 0),
-        RollingPanelTopPosition = UDim2.new(0.5, 0, 0.16, 0),
-        RollingPanelTopAnchorPoint = Vector2.new(0.5, 0.5),
-        RollingScale = 0.56,
-        RollingSpacingScale = 0.5,
+        RollingPanelTopPosition = UDim2.new(0.5, 0, 0.1, 0),
+        RollingPanelTopAnchorPoint = Vector2.new(0.5, 0),
+        RollingScale = 0.5,
+        RollingSpacingScale = 0.42,
+        MaxAnimationYScale = 1 / 3,
     },
 }
