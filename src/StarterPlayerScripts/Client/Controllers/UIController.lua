@@ -27,7 +27,7 @@ local ROLL_DEBUG_PREFIX = "[RollDebug]"
 -- Runtime-generated rolling frames use this name pattern and are cleaned on setup.
 local RUNTIME_ROLLING_SLOT_NAME_PATTERN = "^RollingSlot%d+$"
 -- Emit spin diagnostics once every N whole animation steps.
-local ROLL_SPIN_DEBUG_STEP_INTERVAL = 1
+local ROLL_SPIN_DEBUG_STEP_INTERVAL = 2
 
 local function setText(instance, text)
     if instance and instance:IsA("TextLabel") then
@@ -205,7 +205,7 @@ end
 
 function UIController:_getCenterSlotIndex()
     local configured = math.round(AnimationConfig.RollCenterSlot or 1)
-    local slotCount = #self._rollingSlots > 0 and #self._rollingSlots or AnimationConfig.RollSlotCount
+    local slotCount = AnimationConfig.RollSlotCount
     local clamped = math.clamp(configured, 1, math.max(slotCount, 1))
     if clamped ~= configured then
         self:_debugWarn(
@@ -224,7 +224,11 @@ function UIController:_clearStaleRollingSlots()
     end
 
     for _, child in ipairs(self._rollingMain.Parent:GetChildren()) do
-        if child ~= self._rollingMain and child:IsA("GuiObject") and child.Name:match(RUNTIME_ROLLING_SLOT_NAME_PATTERN) then
+        if child ~= self._rollingMain
+            and child:IsA("GuiObject")
+            and child.Name:match(RUNTIME_ROLLING_SLOT_NAME_PATTERN)
+            and child:GetAttribute("RuntimeRollingSlot") == true
+        then
             child:Destroy()
         end
     end
@@ -583,6 +587,7 @@ function UIController:_ensureRollingSlots()
     for index = 1, AnimationConfig.RollSlotCount do
         local slot = index == 1 and self._rollingMain or self._rollingMain:Clone()
         slot.Name = string.format("RollingSlot%02d", index)
+        slot:SetAttribute("RuntimeRollingSlot", index > 1)
         slot.AnchorPoint = self._rollingAnchorPoint
         slot.Position = self._rollingFinalPosition
         slot.Visible = false
