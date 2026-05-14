@@ -5,7 +5,7 @@ return {
     RollCycleDelay = 0.08,
     ResultHoldSeconds = 1.25,
     RollSlotCount = 5,
-    RollCenterSlot = 2,
+    RollCenterSlot = 3,
     RollSpinDuration = 2.1,
     -- Intentionally large spacing between visible roll slots.
     RollSlotPaddingPixels = 240,
