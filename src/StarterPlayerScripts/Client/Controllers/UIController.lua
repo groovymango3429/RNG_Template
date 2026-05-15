@@ -25,6 +25,14 @@ local MIN_FADE_RANGE = 0.01
 local AUTO_ROLL_DELAY_SECONDS = 1.5
 -- Runtime-generated rolling frames use this name pattern and are cleaned on setup.
 local RUNTIME_ROLLING_SLOT_NAME_PATTERN = "^RollingSlot%d+$"
+local INDEX_ZONE_BY_BUTTON = {
+    Btn01 = "Normal",
+    Btn02 = "Gold",
+    Btn03 = "Diamond",
+    Btn04 = "Candy",
+    Btn05 = "Vulcan",
+    Btn06 = "Rainbow",
+}
 
 local function setText(instance, text)
     if instance and instance:IsA("TextLabel") then
@@ -92,6 +100,21 @@ local function blendTransparency(baseTransparency, alpha)
     return math.clamp(baseTransparency + ((1 - baseTransparency) * alpha), 0, 1)
 end
 
+local function getRarityOrder(rarityName)
+    local rarity = rarityName and Rarities[rarityName]
+    if rarity and type(rarity.Order) == "number" then
+        return rarity.Order
+    end
+    return math.huge
+end
+
+local function getItemDisplayName(item)
+    if type(item) ~= "table" then
+        return ""
+    end
+    return tostring(item.DisplayName or item.Id or item.Name or "")
+end
+
 local function formatOdds(displayOdds)
     -- Normalize configured odds text for the rolling label, e.g. "1 in 100" -> "1/100".
     if type(displayOdds) ~= "string" or displayOdds == "" then
@@ -152,12 +175,19 @@ function UIController.new(remotes, notifier)
     self._rollingIsHorizontal = false
     self._rollAnimationToken = 0
     self._preloadedRollImages = {}
+    self._rollButton = nil
+    self._rollButtonTransparencyBaseline = nil
+    self._indexSelectedZone = nil
+    self._indexTemplateButtons = {}
+    self._indexTemplatesByRarity = {}
+    self._indexFallbackTemplate = nil
 
     if self._ui then
         for _, panelName in ipairs(UIConfig.Panels) do
             self._panels[panelName] = self:_resolvePanel(panelName)
         end
         self:_bindNavigation()
+        self:_bindIndexSidebar()
         self:_bindActions()
         self:_bindCloseButtons()
         self:_bindRewardButtons()
@@ -259,6 +289,30 @@ function UIController:_bindNavigation()
     end
 end
 
+function UIController:_bindIndexSidebar()
+    local indexPanel = self._panels.Index
+    if not indexPanel then
+        return
+    end
+
+    local sidebar = SafeWait.FindPath(indexPanel, { "Sidebar" })
+    if not sidebar then
+        return
+    end
+
+    for buttonName, zoneName in pairs(INDEX_ZONE_BY_BUTTON) do
+        local button = SafeWait.FindPath(sidebar, { buttonName }, true)
+        if button and button:IsA("GuiButton") then
+            self._trove:Connect(button.Activated, function()
+                self._indexSelectedZone = zoneName
+                if self._snapshot then
+                    self:_updateIndex(self._snapshot)
+                end
+            end)
+        end
+    end
+end
+
 function UIController:_invoke(remoteName, ...)
     local remote = self._remotes[remoteName]
     if not remote then
@@ -279,6 +333,9 @@ end
 function UIController:_bindActions()
     local rollButton = self._ui and SafeWait.FindPath(self._ui, UIConfig.ActionButtons.Roll)
     if rollButton and rollButton:IsA("GuiButton") then
+        self._rollButton = rollButton
+        self._rollButtonTransparencyBaseline = self:_captureTransparencyBaseline(rollButton)
+        self:_setRollButtonBusyVisual(self._rollBusy)
         self._trove:Connect(rollButton.Activated, function()
             self:RequestRoll()
         end)
@@ -380,7 +437,7 @@ function UIController:RequestRoll(source)
         return
     end
 
-    self._rollBusy = true
+    self:_setRollBusy(true)
 
     local success, err = xpcall(function()
         local result = self:_invoke("RollRequest")
@@ -409,7 +466,10 @@ function UIController:RequestRoll(source)
         self:_resetRollingUI("roll runtime error")
     end
 
-    self._rollBusy = false
+    self:_setRollBusy(false)
+    if self._snapshot then
+        self:_updateAutoRollState(self._snapshot)
+    end
 end
 
 function UIController:_captureTransparencyBaseline(root)
@@ -443,8 +503,7 @@ function UIController:_captureTransparencyBaseline(root)
     return baseline
 end
 
-function UIController:_applyRollingTransparency(slot, alpha)
-    local baseline = self._rollingTransparencyBaseline[slot]
+function UIController:_applyTransparencyBaseline(baseline, alpha)
     if not baseline then
         return
     end
@@ -464,6 +523,46 @@ function UIController:_applyRollingTransparency(slot, alpha)
             if instance:IsA("UIStroke") and values.Transparency ~= nil then
                 instance.Transparency = blendTransparency(values.Transparency, alpha)
             end
+        end
+    end
+end
+
+function UIController:_applyRollingTransparency(slot, alpha)
+    self:_applyTransparencyBaseline(self._rollingTransparencyBaseline[slot], alpha)
+end
+
+function UIController:_setRollButtonBusyVisual(isBusy)
+    local rollButton = self._rollButton
+    if not rollButton then
+        return
+    end
+
+    rollButton.Active = not isBusy
+    rollButton.AutoButtonColor = not isBusy
+    self:_applyTransparencyBaseline(self._rollButtonTransparencyBaseline, isBusy and 0.35 or 0)
+end
+
+function UIController:_setRollBusy(isBusy)
+    if self._rollBusy == isBusy then
+        return
+    end
+    self._rollBusy = isBusy
+    self:_setRollButtonBusyVisual(isBusy)
+end
+
+function UIController:_ensureIndexTemplates(content)
+    if self._indexFallbackTemplate then
+        return
+    end
+
+    self._indexTemplateButtons = getOrderedButtons(content)
+    for _, template in ipairs(self._indexTemplateButtons) do
+        template.Visible = false
+        template.AutoButtonColor = false
+        local rarityKey = string.lower(template.Name)
+        self._indexTemplatesByRarity[rarityKey] = template
+        if not self._indexFallbackTemplate then
+            self._indexFallbackTemplate = template
         end
     end
 end
@@ -926,18 +1025,63 @@ function UIController:_updateIndex(snapshot)
         return
     end
 
-    local slots = getOrderedButtons(content)
-    local rollTable = snapshot.RollTable or {}
+    self:_ensureIndexTemplates(content)
 
-    for index, button in ipairs(slots) do
-        local item = rollTable[index]
-        if item then
+    local runtimeSlotsToDestroy = {}
+    for _, child in ipairs(content:GetChildren()) do
+        if (child:IsA("TextButton") or child:IsA("ImageButton")) and child:GetAttribute("RuntimeIndexSlot") == true then
+            table.insert(runtimeSlotsToDestroy, child)
+        end
+    end
+    for _, runtimeSlot in ipairs(runtimeSlotsToDestroy) do
+        runtimeSlot:Destroy()
+    end
+
+    local rollTable = snapshot.RollTable or {}
+    local filtered = {}
+    for _, item in ipairs(rollTable) do
+        local zoneName = item and item.Zone
+        if item and (self._indexSelectedZone == nil or zoneName == self._indexSelectedZone) then
+            table.insert(filtered, item)
+        end
+    end
+
+    table.sort(filtered, function(a, b)
+        local rarityOrderA = getRarityOrder(a.Rarity)
+        local rarityOrderB = getRarityOrder(b.Rarity)
+        if rarityOrderA == rarityOrderB then
+            local nameA = getItemDisplayName(a)
+            local nameB = getItemDisplayName(b)
+            if nameA == nameB then
+                local idA = a.Id
+                local idB = b.Id
+                if type(idA) == "number" and type(idB) == "number" then
+                    return idA < idB
+                end
+                return tostring(idA or "") < tostring(idB or "")
+            end
+            return nameA < nameB
+        end
+        return rarityOrderA < rarityOrderB
+    end)
+
+    for index, item in ipairs(filtered) do
+        local rarityKey = string.lower(tostring(item.Rarity or ""))
+        local template = self._indexTemplatesByRarity[rarityKey] or self._indexFallbackTemplate
+        if template then
+            local button = template:Clone()
+            button.Name = string.format("RuntimeIndexItem_%02d", index)
+            button:SetAttribute("RuntimeIndexSlot", true)
+            button.LayoutOrder = index
+            button.Visible = true
+            button.Parent = content
+
             local nameLabel = findLabel(button, {
                 { "Label01", "BrainrotName" },
                 { "Label01", "Main" },
             })
             local owned = snapshot.Index and snapshot.Index[item.Id] == true
-            setText(nameLabel, owned and item.DisplayName or "???")
+            setText(nameLabel, owned and getItemDisplayName(item) or "???")
             button.AutoButtonColor = owned
         end
     end
@@ -1050,13 +1194,21 @@ end
 
 function UIController:_updateAutoRollState(snapshot)
     self:_updateRewardsPanelLayout(snapshot)
-    self:_updateRollingLayout(snapshot)
+    if not self._rollBusy then
+        self:_updateRollingLayout(snapshot)
+    end
 
     local shouldEnableAutoRoll = snapshot.Stats and snapshot.Stats.AutoRoll == true
     if shouldEnableAutoRoll ~= self._autoRollEnabled then
         self._autoRollEnabled = shouldEnableAutoRoll
         self._autoRollThreadToken += 1
-        self:_resetRollingUI(shouldEnableAutoRoll and "auto-roll enabled" or "auto-roll disabled")
+        if not self._rollBusy then
+            self:_resetRollingUI(shouldEnableAutoRoll and "auto-roll enabled" or "auto-roll disabled")
+        end
+    end
+
+    if self._rollBusy then
+        return
     end
 
     if not self._autoRollEnabled then
