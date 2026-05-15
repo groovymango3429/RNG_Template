@@ -1049,7 +1049,12 @@ function UIController:_updateIndex(snapshot)
             local nameA = getItemDisplayName(a)
             local nameB = getItemDisplayName(b)
             if nameA == nameB then
-                return tostring(a.Id or "") < tostring(b.Id or "")
+                local idA = a.Id
+                local idB = b.Id
+                if type(idA) == "number" and type(idB) == "number" then
+                    return idA < idB
+                end
+                return tostring(idA or "") < tostring(idB or "")
             end
             return nameA < nameB
         end
@@ -1061,7 +1066,7 @@ function UIController:_updateIndex(snapshot)
         local template = self._indexTemplatesByRarity[rarityKey] or self._indexFallbackTemplate
         if template then
             local button = template:Clone()
-            button.Name = string.format("IndexItem_%02d_%s", index, getItemDisplayName(item))
+            button.Name = string.format("IndexItem_%02d", index)
             button:SetAttribute("RuntimeIndexSlot", true)
             button.LayoutOrder = index
             button.Visible = true
