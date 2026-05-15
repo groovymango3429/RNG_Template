@@ -1117,6 +1117,7 @@ function UIController:PlayRollResult(result)
     local token = self._rollAnimationToken
     local centerSlotIndex = self:_getCenterSlotIndex()
     local sequence, previewSteps, centerSequenceIndex = self:_buildRollSequence(resolvedResultItem, centerSlotIndex)
+    -- With the current UI layout, slot 2 is the visual center even though RollCenterSlot remains 3.
     local winningSlotIndex = math.clamp(centerSlotIndex - 1, 1, #self._rollingSlots)
     local rewardSequenceIndex = math.max(centerSequenceIndex - 2, 1)
     sequence[rewardSequenceIndex] = resolvedResultItem
@@ -1207,7 +1208,7 @@ function UIController:PlayRollResult(result)
         end
         local expectedName = tostring(resolvedResultItem.DisplayName or resolvedResultItem.Name or "")
         local expectedImage = tostring(resolvedResultItem.Icon or "")
-        print(string.format(
+        warn(string.format(
             "[RollSlot2Check] slot=%d petText='%s' expectedPet='%s' image='%s' expectedImage='%s' petMatch=%s imageMatch=%s",
             winningSlotIndex,
             petNameText,
