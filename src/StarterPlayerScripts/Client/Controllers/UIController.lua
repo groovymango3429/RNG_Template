@@ -1117,7 +1117,7 @@ function UIController:PlayRollResult(result)
     local token = self._rollAnimationToken
     local centerSlotIndex = self:_getCenterSlotIndex()
     local sequence, previewSteps, centerSequenceIndex = self:_buildRollSequence(resolvedResultItem, centerSlotIndex)
-    local rewardSlotIndex = math.clamp(centerSlotIndex - 1, 1, #self._rollingSlots)
+    local winningSlotIndex = math.clamp(centerSlotIndex - 1, 1, #self._rollingSlots)
     local rewardSequenceIndex = math.max(centerSequenceIndex - 2, 1)
     sequence[rewardSequenceIndex] = resolvedResultItem
     local fadeStartDistance = AnimationConfig.RollFadeStartDistance
@@ -1159,12 +1159,14 @@ function UIController:PlayRollResult(result)
     end
 
     local finalBaseIndex = previewSteps + 1
-    local rightNeighborSlotIndex = math.min(rewardSlotIndex + 2, #self._rollingSlots)
+    -- Keep slot 4 different from the rewarded pet for the final snapped frame.
+    -- With the current layout this corresponds to winningSlotIndex + 2.
+    local slotFourIndex = math.min(winningSlotIndex + 2, #self._rollingSlots)
     for slotIndex, slot in ipairs(self._rollingSlots) do
         local finalItem = sequence[finalBaseIndex + slotIndex - 1] or resolvedResultItem
-        if slotIndex == rewardSlotIndex then
+        if slotIndex == winningSlotIndex then
             finalItem = resolvedResultItem
-        elseif slotIndex == rightNeighborSlotIndex and self:_rollItemsMatch(finalItem, resolvedResultItem) then
+        elseif slotIndex == slotFourIndex and self:_rollItemsMatch(finalItem, resolvedResultItem) then
             for _, fallbackItem in ipairs(self._rollTable) do
                 local resolvedFallback = self:_resolveRollItem(fallbackItem)
                 if resolvedFallback and not self:_rollItemsMatch(resolvedFallback, resolvedResultItem) then
@@ -1182,9 +1184,9 @@ function UIController:PlayRollResult(result)
         self:_setRollingSlotState(slot, finalItem, positionOffset, alpha)
     end
 
-    local winningSlot = self._rollingSlots[rewardSlotIndex]
+    local winningSlot = self._rollingSlots[winningSlotIndex]
     for slotIndex, slot in ipairs(self._rollingSlots) do
-        if slotIndex == rewardSlotIndex then
+        if slotIndex == winningSlotIndex then
             self:_setRollingSlotState(slot, resolvedResultItem, 0, 0)
         else
             slot.Visible = false
@@ -1207,7 +1209,7 @@ function UIController:PlayRollResult(result)
         local expectedImage = tostring(resolvedResultItem.Icon or "")
         print(string.format(
             "[RollSlot2Check] slot=%d petText='%s' expectedPet='%s' image='%s' expectedImage='%s' petMatch=%s imageMatch=%s",
-            rewardSlotIndex,
+            winningSlotIndex,
             petNameText,
             expectedName,
             imageText,
