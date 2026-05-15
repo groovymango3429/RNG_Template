@@ -1027,10 +1027,14 @@ function UIController:_updateIndex(snapshot)
 
     self:_ensureIndexTemplates(content)
 
+    local runtimeSlotsToDestroy = {}
     for _, child in ipairs(content:GetChildren()) do
         if (child:IsA("TextButton") or child:IsA("ImageButton")) and child:GetAttribute("RuntimeIndexSlot") == true then
-            child:Destroy()
+            table.insert(runtimeSlotsToDestroy, child)
         end
+    end
+    for _, runtimeSlot in ipairs(runtimeSlotsToDestroy) do
+        runtimeSlot:Destroy()
     end
 
     local rollTable = snapshot.RollTable or {}
@@ -1066,7 +1070,7 @@ function UIController:_updateIndex(snapshot)
         local template = self._indexTemplatesByRarity[rarityKey] or self._indexFallbackTemplate
         if template then
             local button = template:Clone()
-            button.Name = string.format("IndexItem_%02d", index)
+            button.Name = string.format("RuntimeIndexItem_%02d", index)
             button:SetAttribute("RuntimeIndexSlot", true)
             button.LayoutOrder = index
             button.Visible = true
