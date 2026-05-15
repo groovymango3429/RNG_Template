@@ -1070,14 +1070,12 @@ function UIController:_updateAutoRollState(snapshot)
     local token = self._autoRollThreadToken
     self._autoRollLoopRunning = true
     self._autoRollThread = task.spawn(function()
-        self:_debugLog("Auto-roll loop started.")
         while self._autoRollEnabled and token == self._autoRollThreadToken do
             if not self._rollBusy then
                 self:RequestRoll("AutoRoll")
             end
             task.wait(AUTO_ROLL_DELAY_SECONDS)
         end
-        self:_debugLog("Auto-roll loop ended.")
         self._autoRollLoopRunning = false
         self._autoRollThread = nil
     end)
@@ -1103,57 +1101,32 @@ end
 
 function UIController:PlayRollResult(result)
     if not result or not result.Item then
-        self:_debugWarn("Roll failed: PlayRollResult called without a valid item.")
         self:_resetRollingUI("invalid play result")
         return
     end
 
     if not self:_ensureRollingSlots() then
-        self:_debugWarn("Roll blocked: rolling slots are unavailable.")
         self:_resetRollingUI("rolling slots unavailable")
         return
     end
 
     local resolvedResultItem = self:_resolveRollItem(result.Item) or result.Item
-    self:_debugLog("Reward pet selected: %s", self:_describeRollItem(resolvedResultItem))
     self:_preloadRollImages({ resolvedResultItem })
 
     self._rollAnimationToken += 1
     local token = self._rollAnimationToken
     local centerSlotIndex = self:_getCenterSlotIndex()
     local sequence, previewSteps, centerSequenceIndex = self:_buildRollSequence(resolvedResultItem, centerSlotIndex)
-    local middleSequenceItem = sequence[centerSequenceIndex] or resolvedResultItem
-    if not self:_rollItemsMatch(middleSequenceItem, resolvedResultItem) then
-        self:_debugWarn(
-            "ERROR: animation middle pet (%s) does not match rewarded pet (%s).",
-            self:_describeRollItem(middleSequenceItem),
-            self:_describeRollItem(resolvedResultItem)
-        )
-        sequence[centerSequenceIndex] = resolvedResultItem
-        middleSequenceItem = resolvedResultItem
-    end
-    self:_debugLog("Middle animation pet: %s", self:_describeRollItem(middleSequenceItem))
-    self:_debugLog(
-        "Middle/reward match: %s",
-        self:_rollItemsMatch(middleSequenceItem, resolvedResultItem) and "YES" or "NO"
-    )
+    local rewardSlotIndex = math.clamp(centerSlotIndex - 1, 1, #self._rollingSlots)
+    local rewardSequenceIndex = math.max(centerSequenceIndex - 2, 1)
+    sequence[rewardSequenceIndex] = resolvedResultItem
     local fadeStartDistance = AnimationConfig.RollFadeStartDistance
     local fadeRange = math.max(AnimationConfig.RollFadeEndDistance - fadeStartDistance, MIN_FADE_RANGE)
     local slotSpacingPixels = self:_getRollingSlotSpacingPixels()
     local maxAutoRollPositionOffset = self:_getAutoRollMaxYOffsetPixels()
-    self:_debugLog(
-        "Roll animation config: slotCount=%d centerSlot=%d slotSpacing=%.2f padding=%d horizontal=%s basePos=%s",
-        AnimationConfig.RollSlotCount,
-        centerSlotIndex,
-        slotSpacingPixels,
-        AnimationConfig.RollSlotPaddingPixels,
-        tostring(self._rollingIsHorizontal),
-        formatUDim2(self._rollingFinalPosition)
-    )
 
     self:_hideRollingSlots()
     local startedAt = os.clock()
-    local lastLoggedWholeSteps = -1
     while token == self._rollAnimationToken do
         local progress = math.clamp((os.clock() - startedAt) / AnimationConfig.RollSpinDuration, 0, 1)
         local eased = TweenService:GetValue(progress, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
@@ -1161,9 +1134,6 @@ function UIController:PlayRollResult(result)
         local wholeSteps = math.floor(distance)
         local fractionalStep = distance - wholeSteps
         local baseIndex = wholeSteps + 1
-        local shouldLogStep = wholeSteps ~= lastLoggedWholeSteps
-            and ((wholeSteps % ROLL_SPIN_DEBUG_STEP_INTERVAL == 0) or progress >= 1)
-        local slotSnapshots = shouldLogStep and {} or nil
 
         for slotIndex, slot in ipairs(self._rollingSlots) do
             local item = sequence[baseIndex + slotIndex - 1] or resolvedResultItem
@@ -1174,32 +1144,8 @@ function UIController:PlayRollResult(result)
             if slotDistanceFromCenter >= fadeStartDistance then
                 alpha = math.clamp((slotDistanceFromCenter - fadeStartDistance) / fadeRange, 0, 1)
             end
-            if slotSnapshots then
-                table.insert(
-                    slotSnapshots,
-                    string.format(
-                        "#%d:%s@offset=%.2f,a=%.2f,pos=%s",
-                        slotIndex,
-                        self:_describeRollItem(item),
-                        positionOffset,
-                        alpha,
-                        formatVector2(slot.AbsolutePosition)
-                    )
-                )
-            end
             self:_setRollingSlotState(slot, item, positionOffset, alpha)
         end
-        if slotSnapshots then
-            self:_debugLog(
-                "Spin step=%d progress=%.3f baseIndex=%d centerSeqIndex=%d slots={%s}",
-                wholeSteps,
-                progress,
-                baseIndex,
-                centerSequenceIndex,
-                table.concat(slotSnapshots, " | ")
-            )
-        end
-        lastLoggedWholeSteps = wholeSteps
 
         if progress >= 1 then
             break
@@ -1213,8 +1159,20 @@ function UIController:PlayRollResult(result)
     end
 
     local finalBaseIndex = previewSteps + 1
+    local rightNeighborSlotIndex = math.min(rewardSlotIndex + 2, #self._rollingSlots)
     for slotIndex, slot in ipairs(self._rollingSlots) do
         local finalItem = sequence[finalBaseIndex + slotIndex - 1] or resolvedResultItem
+        if slotIndex == rewardSlotIndex then
+            finalItem = resolvedResultItem
+        elseif slotIndex == rightNeighborSlotIndex and self:_rollItemsMatch(finalItem, resolvedResultItem) then
+            for _, fallbackItem in ipairs(self._rollTable) do
+                local resolvedFallback = self:_resolveRollItem(fallbackItem)
+                if resolvedFallback and not self:_rollItemsMatch(resolvedFallback, resolvedResultItem) then
+                    finalItem = resolvedFallback
+                    break
+                end
+            end
+        end
         local slotDistanceFromCenter = math.abs(slotIndex - centerSlotIndex)
         local positionOffset = (slotIndex - centerSlotIndex) * slotSpacingPixels
         local alpha = 0
@@ -1224,23 +1182,43 @@ function UIController:PlayRollResult(result)
         self:_setRollingSlotState(slot, finalItem, positionOffset, alpha)
     end
 
-    local winningSlot = self._rollingSlots[centerSlotIndex]
+    local winningSlot = self._rollingSlots[rewardSlotIndex]
     for slotIndex, slot in ipairs(self._rollingSlots) do
-        if slotIndex == centerSlotIndex then
-            self:_setRollingSlotState(slot, middleSequenceItem, 0, 0)
+        if slotIndex == rewardSlotIndex then
+            self:_setRollingSlotState(slot, resolvedResultItem, 0, 0)
         else
             slot.Visible = false
         end
     end
-    self:_debugLog(
-        "Winning slot reveal: centerSlot=%d reward=%s winningSlotAbsPos=%s",
-        centerSlotIndex,
-        self:_describeRollItem(middleSequenceItem),
-        winningSlot and formatVector2(winningSlot.AbsolutePosition) or "nil"
-    )
 
     if winningSlot then
-        self:_playWinningReveal(winningSlot, middleSequenceItem, token)
+        local refs = self._rollingSlotRefs[winningSlot]
+        local petNameText = ""
+        local imageText = ""
+        if refs then
+            if refs.PetName and refs.PetName:IsA("TextLabel") then
+                petNameText = refs.PetName.Text
+            end
+            if refs.Image and refs.Image:IsA("ImageLabel") then
+                imageText = refs.Image.Image
+            end
+        end
+        local expectedName = tostring(resolvedResultItem.DisplayName or resolvedResultItem.Name or "")
+        local expectedImage = tostring(resolvedResultItem.Icon or "")
+        print(string.format(
+            "[RollSlot2Check] slot=%d petText='%s' expectedPet='%s' image='%s' expectedImage='%s' petMatch=%s imageMatch=%s",
+            rewardSlotIndex,
+            petNameText,
+            expectedName,
+            imageText,
+            expectedImage,
+            tostring(petNameText == expectedName),
+            tostring(imageText == expectedImage)
+        ))
+    end
+
+    if winningSlot then
+        self:_playWinningReveal(winningSlot, resolvedResultItem, token)
     end
 
     if token ~= self._rollAnimationToken then
@@ -1248,7 +1226,6 @@ function UIController:PlayRollResult(result)
         return
     end
 
-    self:_debugLog("Roll animation ended.")
     self:_resetRollingUI("roll animation completed")
 end
 
