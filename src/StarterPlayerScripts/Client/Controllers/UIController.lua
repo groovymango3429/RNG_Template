@@ -108,6 +108,13 @@ local function getRarityOrder(rarityName)
     return math.huge
 end
 
+local function getItemDisplayName(item)
+    if type(item) ~= "table" then
+        return ""
+    end
+    return tostring(item.DisplayName or item.Id or item.Name or "")
+end
+
 local function formatOdds(displayOdds)
     -- Normalize configured odds text for the rolling label, e.g. "1 in 100" -> "1/100".
     if type(displayOdds) ~= "string" or displayOdds == "" then
@@ -541,6 +548,23 @@ function UIController:_setRollBusy(isBusy)
     end
     self._rollBusy = isBusy
     self:_setRollButtonBusyVisual(isBusy)
+end
+
+function UIController:_ensureIndexTemplates(content)
+    if self._indexFallbackTemplate then
+        return
+    end
+
+    self._indexTemplateButtons = getOrderedButtons(content)
+    for _, template in ipairs(self._indexTemplateButtons) do
+        template.Visible = false
+        template.AutoButtonColor = false
+        local rarityKey = string.lower(template.Name)
+        self._indexTemplatesByRarity[rarityKey] = template
+        if not self._indexFallbackTemplate then
+            self._indexFallbackTemplate = template
+        end
+    end
 end
 
 function UIController:_hideRollingSlots()
@@ -1001,18 +1025,7 @@ function UIController:_updateIndex(snapshot)
         return
     end
 
-    if not self._indexFallbackTemplate then
-        self._indexTemplateButtons = getOrderedButtons(content)
-        for _, template in ipairs(self._indexTemplateButtons) do
-            template.Visible = false
-            template.AutoButtonColor = false
-            local rarityKey = string.lower(template.Name)
-            self._indexTemplatesByRarity[rarityKey] = template
-            if not self._indexFallbackTemplate then
-                self._indexFallbackTemplate = template
-            end
-        end
-    end
+    self:_ensureIndexTemplates(content)
 
     for _, child in ipairs(content:GetChildren()) do
         if (child:IsA("TextButton") or child:IsA("ImageButton")) and child:GetAttribute("RuntimeIndexSlot") == true then
@@ -1033,8 +1046,8 @@ function UIController:_updateIndex(snapshot)
         local rarityOrderA = getRarityOrder(a.Rarity)
         local rarityOrderB = getRarityOrder(b.Rarity)
         if rarityOrderA == rarityOrderB then
-            local nameA = tostring(a.DisplayName or a.Id or a.Name or "")
-            local nameB = tostring(b.DisplayName or b.Id or b.Name or "")
+            local nameA = getItemDisplayName(a)
+            local nameB = getItemDisplayName(b)
             if nameA == nameB then
                 return tostring(a.Id or "") < tostring(b.Id or "")
             end
@@ -1048,7 +1061,7 @@ function UIController:_updateIndex(snapshot)
         local template = self._indexTemplatesByRarity[rarityKey] or self._indexFallbackTemplate
         if template then
             local button = template:Clone()
-            button.Name = string.format("IndexItem_%02d_%s", index, tostring(item.Id or item.DisplayName or "Item"))
+            button.Name = string.format("IndexItem_%02d_%s", index, getItemDisplayName(item))
             button:SetAttribute("RuntimeIndexSlot", true)
             button.LayoutOrder = index
             button.Visible = true
@@ -1059,7 +1072,7 @@ function UIController:_updateIndex(snapshot)
                 { "Label01", "Main" },
             })
             local owned = snapshot.Index and snapshot.Index[item.Id] == true
-            setText(nameLabel, owned and tostring(item.DisplayName or item.Id or "???") or "???")
+            setText(nameLabel, owned and getItemDisplayName(item) or "???")
             button.AutoButtonColor = owned
         end
     end
