@@ -74,7 +74,13 @@ end
 MonetizationService:SetDispatch(pushState, notify)
 
 local function onPlayerAdded(player)
-    local _, isFallback = DataService:LoadProfile(player)
+    local profile, isFallback = DataService:LoadProfile(player)
+    if profile then
+        profile.Settings.AutoRoll = false
+        if profile.Meta.SaveMode ~= "Fallback" then
+            DataService:MarkDirty(player)
+        end
+    end
     MonetizationService:LoadPlayer(player)
     pushState(player)
 
