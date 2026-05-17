@@ -22,7 +22,7 @@ function FormatUtil.Number(value)
         local suffix = entry[2]
         if absolute >= threshold then
             local scaled = absolute / threshold
-            local decimals = if scaled >= 100 then 0 elseif scaled >= 10 then 1 else 2
+            local decimals = (if scaled >= 100 then 0 elseif scaled >= 10 then 1 else 2)
             local scaleFactor = 10 ^ decimals
             scaled = math.floor(scaled * scaleFactor) / scaleFactor
             local formatString = "%." .. tostring(decimals) .. "f"

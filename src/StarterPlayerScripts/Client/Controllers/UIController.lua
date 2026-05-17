@@ -82,7 +82,7 @@ local function findFirstDescendantByName(root, name, className)
     return nil
 end
 
-local function findFirstDescendantByNameInsensitive(root, names, className)
+local function findFirstDescendantByNamesInsensitive(root, names, className)
     if not root then
         return nil
     end
@@ -639,10 +639,10 @@ function UIController:_setupCurrencyUI()
 
     for _, root in ipairs(roots) do
         if not cashContainer then
-            cashContainer = findFirstDescendantByNameInsensitive(root, { "CashGui", "CashUI", "Cash" }, "GuiObject")
+            cashContainer = findFirstDescendantByNamesInsensitive(root, { "CashGui", "CashUI", "Cash" }, "GuiObject")
         end
         if not shardContainer then
-            shardContainer = findFirstDescendantByNameInsensitive(root, { "ShardGui", "ShardsGui", "ShardUI", "Shard", "Shards" }, "GuiObject")
+            shardContainer = findFirstDescendantByNamesInsensitive(root, { "ShardGui", "ShardsGui", "ShardUI", "Shard", "Shards" }, "GuiObject")
         end
     end
 
@@ -663,7 +663,7 @@ function UIController:_setupCurrencyUI()
             return label
         end
 
-        return findFirstDescendantByNameInsensitive(container, { "Main", "Amount", "Value", "Text", "Label01", "Label02" }, "TextLabel")
+        return findFirstDescendantByNamesInsensitive(container, { "Main", "Amount", "Value", "Text", "Label01", "Label02" }, "TextLabel")
     end
 
     self._currencyRefs = {

@@ -47,12 +47,16 @@ function RebirthService:TryRebirth(player, skipRequirement)
     end
 
     self._dataService:UpdateProfile(player, function(profile)
+        local currentRebirths = profile.Stats.Rebirths or 0
+        local nextStage = ProgressionConfig.RebirthStages[math.min(currentRebirths + 1, #ProgressionConfig.RebirthStages)]
+        local requiredShards = nextStage and (nextStage.RequiredShards or nextStage.RequiredRolls) or 0
+        local bonusShards = nextStage and (nextStage.BonusShards or nextStage.BonusGems) or 0
         local currentShards = profile.Stats.Shards or profile.Stats.Gems or 0
-        local spentShards = skipRequirement and 0 or state.NextRequiredShards
+        local spentShards = skipRequirement and 0 or requiredShards
         local remainingShards = math.max(0, currentShards - spentShards)
-        local awardedShards = remainingShards + (state.NextBonusShards or 0)
+        local awardedShards = remainingShards + bonusShards
 
-        profile.Stats.Rebirths = (profile.Stats.Rebirths or 0) + 1
+        profile.Stats.Rebirths = currentRebirths + 1
         profile.Stats.Rolls = 0
         profile.Stats.Coins = 0
         profile.Stats.Cash = 0
