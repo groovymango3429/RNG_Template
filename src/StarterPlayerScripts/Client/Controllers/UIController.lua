@@ -89,7 +89,7 @@ local function findFirstDescendantByNamesInsensitive(root, names, className)
 
     local lookup = {}
     for _, candidate in ipairs(names) do
-        if type(candidate) == "string" and candidate ~= "" then
+        if candidate ~= "" then
             lookup[string.lower(candidate)] = true
         end
     end

@@ -66,8 +66,12 @@ local function migrateProfile(profile)
     end
 
     local stats = profile.Stats
-    local coins = tonumber(stats.Cash or stats.Coins) or 0
-    local shards = tonumber(stats.Shards or stats.Gems) or 0
+    local cashAmount = tonumber(stats.Cash)
+    local coinAmount = tonumber(stats.Coins)
+    local shardAmount = tonumber(stats.Shards)
+    local gemAmount = tonumber(stats.Gems)
+    local coins = math.max(cashAmount or 0, coinAmount or 0)
+    local shards = math.max(shardAmount or 0, gemAmount or 0)
 
     stats.Coins = math.max(0, math.floor(coins))
     stats.Cash = stats.Coins

@@ -31,7 +31,10 @@ function FormatUtil.Number(value)
             local scaleFactor = SCALE_FACTOR_BY_DECIMALS[decimals] or 1
             scaled = math.floor(scaled * scaleFactor) / scaleFactor
             local formatString = "%." .. tostring(decimals) .. "f"
-            local compact = string.format(formatString, scaled):gsub("%.?0+$", "")
+            local compact = string.format(formatString, scaled)
+            if compact:find("%.") then
+                compact = compact:gsub("0+$", ""):gsub("%.$", "")
+            end
             return (isNegative and "-" or "") .. compact .. suffix
         end
     end
