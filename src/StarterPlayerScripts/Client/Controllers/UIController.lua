@@ -143,6 +143,14 @@ local function getRarityColor(rarityName)
     return rarity and rarity.Color or Color3.fromRGB(255, 255, 255)
 end
 
+local function formatSignedStat(value)
+    local amount = math.floor(tonumber(value) or 0)
+    if amount > 0 then
+        return string.format("+%s", FormatUtil.Number(amount))
+    end
+    return FormatUtil.Number(amount)
+end
+
 
 function UIController.new(remotes, notifier)
     local self = setmetatable({}, UIController)
@@ -521,8 +529,8 @@ function UIController:_updateInventoryDetail(entry, equippedItemLookup)
     setImage(refs.DetailItem, item and item.Icon or "")
     setText(refs.DetailName, item and getItemDisplayName(item) or "No Item")
     setText(refs.DetailRarity, item and tostring(item.Rarity or "") or "")
-    setText(refs.DetailDamage, string.format("+%s", FormatUtil.Number(item and (item.Damage or item.RewardCoins or 0) or 0)))
-    setText(refs.DetailHealth, string.format("+%s", FormatUtil.Number(item and (item.Health or item.RewardHealth or 0) or 0)))
+    setText(refs.DetailDamage, formatSignedStat(item and (item.Damage or item.RewardCoins or 0) or 0))
+    setText(refs.DetailHealth, formatSignedStat(item and (item.Health or item.RewardHealth or 0) or 0))
     if refs.DetailRarity and refs.DetailRarity:IsA("TextLabel") then
         refs.DetailRarity.TextColor3 = getRarityColor(item and item.Rarity or nil)
     end
