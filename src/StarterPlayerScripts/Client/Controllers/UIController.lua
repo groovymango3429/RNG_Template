@@ -1082,12 +1082,10 @@ function UIController:_updateIndex(snapshot)
             })
             local owned = snapshot.Index and snapshot.Index[item.Id] == true
             setText(nameLabel, owned and getItemDisplayName(item) or "???")
-            if nameLabel then
-                if not owned then
-                    nameLabel.TextTransparency = 0
-                    nameLabel.TextStrokeTransparency = 0.25
-                    nameLabel.ZIndex = math.max(nameLabel.ZIndex, button.ZIndex + 2)
-                end
+            if nameLabel and not owned then
+                nameLabel.TextTransparency = 0
+                nameLabel.TextStrokeTransparency = 0.25
+                nameLabel.ZIndex = math.max(nameLabel.ZIndex, button.ZIndex + 2)
             end
             button.AutoButtonColor = owned
         end
