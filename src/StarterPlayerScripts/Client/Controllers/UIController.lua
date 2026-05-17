@@ -1086,8 +1086,8 @@ function UIController:_updateIndex(snapshot)
                 if not owned then
                     nameLabel.TextTransparency = 0
                     nameLabel.TextStrokeTransparency = 0.25
+                    nameLabel.ZIndex = math.max(nameLabel.ZIndex, button.ZIndex + 2)
                 end
-                nameLabel.ZIndex = math.max(nameLabel.ZIndex, button.ZIndex + 2)
             end
             button.AutoButtonColor = owned
         end
