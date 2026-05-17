@@ -400,9 +400,8 @@ function UIController:_bindCloseButtons()
         end
         if button and button:IsA("GuiButton") then
             self._trove:Connect(button.Activated, function()
-                local closePanel = self._panels[panelName]
-                if closePanel then
-                    setPanelVisible(closePanel, false)
+                if panel then
+                    setPanelVisible(panel, false)
                 end
             end)
         end
@@ -617,7 +616,7 @@ function UIController:_updateInventory(snapshot)
         end
 
         local equippedStroke = self:_ensureInventorySlotStroke(slot)
-        equippedStroke.Transparency = entry.Id == equippedItemId and 0 or 1
+        equippedStroke.Transparency = (entry.Id == equippedItemId) and 0 or 1
 
         self._trove:Connect(slot.Activated, function()
             self._inventorySelectedItemId = entry.Id

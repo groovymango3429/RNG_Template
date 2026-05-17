@@ -238,20 +238,21 @@ RemoteService:Get("RequestEquipItem").OnServerInvoke = function(player, itemId)
         return { Success = false, Message = "Item not found." }
     end
 
+    local didEquip = false
     local profile = DataService:UpdateProfile(player, function(activeProfile)
         local owned = (activeProfile.Inventory and activeProfile.Inventory[itemId]) or 0
         if owned <= 0 then
             return
         end
         activeProfile.EquippedItemId = itemId
+        didEquip = true
     end)
 
     if not profile then
         return { Success = false, Message = "Profile not loaded." }
     end
 
-    local ownedCount = (profile.Inventory and profile.Inventory[itemId]) or 0
-    if ownedCount <= 0 then
+    if not didEquip then
         return { Success = false, Message = "You do not own this item." }
     end
 
@@ -264,10 +265,12 @@ RemoteService:Get("RequestEquipItem").OnServerInvoke = function(player, itemId)
 end
 
 RemoteService:Get("RequestEquipBestItem").OnServerInvoke = function(player)
+    local equippedBestId = nil
     local profile = DataService:UpdateProfile(player, function(activeProfile)
         local bestId = resolveBestOwnedItemId(activeProfile)
         if bestId then
             activeProfile.EquippedItemId = bestId
+            equippedBestId = bestId
         end
     end)
 
@@ -275,18 +278,17 @@ RemoteService:Get("RequestEquipBestItem").OnServerInvoke = function(player)
         return { Success = false, Message = "Profile not loaded." }
     end
 
-    local bestId = profile.EquippedItemId
-    if type(bestId) ~= "string" or bestId == "" then
+    if type(equippedBestId) ~= "string" or equippedBestId == "" then
         return { Success = false, Message = "No item available to equip." }
     end
 
-    local ownedCount = (profile.Inventory and profile.Inventory[bestId]) or 0
+    local ownedCount = (profile.Inventory and profile.Inventory[equippedBestId]) or 0
     if ownedCount <= 0 then
         return { Success = false, Message = "No item available to equip." }
     end
 
     pushState(player)
-    return { Success = true, EquippedItemId = bestId }
+    return { Success = true, EquippedItemId = equippedBestId }
 end
 
 RemoteService:Get("PromptGamepassPurchase").OnServerInvoke = function(player, key)
