@@ -36,7 +36,9 @@ local INDEX_ZONE_BY_BUTTON = {
     Btn05 = "Vulcan",
     Btn06 = "Rainbow",
 }
-local INVENTORY_EQUIPPED_COLOR = Color3.fromRGB(110, 224, 122)
+local INVENTORY_SELECTION_COLOR = Color3.fromRGB(110, 224, 122)
+local READY_BUTTON_EQUIP_COLOR = Color3.fromRGB(110, 224, 122)
+local READY_BUTTON_UNEQUIP_COLOR = Color3.fromRGB(232, 90, 90)
 
 local function setText(instance, text)
     if instance and instance:IsA("TextLabel") then
@@ -64,6 +66,52 @@ local function findLabel(root, candidatePaths)
         end
     end
     return nil
+end
+
+local function findFirstDescendantByName(root, name, className)
+    if not root then
+        return nil
+    end
+
+    for _, descendant in ipairs(root:GetDescendants()) do
+        if descendant.Name == name and (className == nil or descendant:IsA(className)) then
+            return descendant
+        end
+    end
+
+    return nil
+end
+
+local function findFirstSlotTemplate(container)
+    if not container then
+        return nil
+    end
+
+    for _, child in ipairs(container:GetChildren()) do
+        if (child:IsA("Frame") or child:IsA("TextButton") or child:IsA("ImageButton")) and child.Name:match("^Slot%d+$") then
+            return child
+        end
+    end
+
+    return nil
+end
+
+local function findListSectionTemplate(root, excludedContainer)
+    if not root then
+        return nil, nil
+    end
+
+    for _, descendant in ipairs(root:GetDescendants()) do
+        if descendant ~= excludedContainer and (descendant:IsA("Frame") or descendant:IsA("ScrollingFrame")) then
+            local hasListLayout = descendant:FindFirstChildOfClass("UIListLayout") ~= nil
+            local template = findFirstSlotTemplate(descendant)
+            if hasListLayout and template then
+                return descendant, template
+            end
+        end
+    end
+
+    return nil, nil
 end
 
 local function getOrderedButtons(container)
@@ -452,17 +500,51 @@ function UIController:_bindRewardButtons()
 end
 
 function UIController:_ensureInventorySlotStroke(slot)
-    local stroke = slot:FindFirstChild("EquippedStroke")
+    local stroke = slot:FindFirstChild("SelectedStroke")
     if not stroke or not stroke:IsA("UIStroke") then
         stroke = Instance.new("UIStroke")
-        stroke.Name = "EquippedStroke"
+        stroke.Name = "SelectedStroke"
         stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
         stroke.Thickness = 2
         stroke.Transparency = 1
         stroke.Parent = slot
     end
-    stroke.Color = INVENTORY_EQUIPPED_COLOR
+
+    local corner = slot:FindFirstChild("SelectedCorner")
+    if not corner or not corner:IsA("UICorner") then
+        corner = Instance.new("UICorner")
+        corner.Name = "SelectedCorner"
+        corner.CornerRadius = UDim.new(0, 10)
+        corner.Parent = slot
+    end
+
+    stroke.Color = INVENTORY_SELECTION_COLOR
     return stroke
+end
+
+function UIController:_updateReadyButtonStyle(isEquipped)
+    local refs = self._inventoryRefs
+    if not refs then
+        return
+    end
+
+    local actionColor = isEquipped and READY_BUTTON_UNEQUIP_COLOR or READY_BUTTON_EQUIP_COLOR
+    if refs.ReadyButton and refs.ReadyButton:IsA("GuiObject") then
+        refs.ReadyButton.BackgroundColor3 = actionColor
+    end
+    if refs.ReadyButtonBG and refs.ReadyButtonBG:IsA("GuiObject") then
+        refs.ReadyButtonBG.BackgroundColor3 = actionColor
+    end
+
+    if refs.ReadyButton then
+        for _, descendant in ipairs(refs.ReadyButton:GetDescendants()) do
+            if descendant:IsA("TextLabel") then
+                descendant.TextStrokeColor3 = actionColor
+            elseif descendant:IsA("UIStroke") then
+                descendant.Color = actionColor
+            end
+        end
+    end
 end
 
 function UIController:_setupInventoryUI()
@@ -478,17 +560,27 @@ function UIController:_setupInventoryUI()
         self._inventoryTemplate.Visible = false
     end
 
+    local equippedFrame, equippedTemplate = findListSectionTemplate(inventoryPanel, slotsFrame)
+    if equippedTemplate and (equippedTemplate:IsA("Frame") or equippedTemplate:IsA("TextButton") or equippedTemplate:IsA("ImageButton")) then
+        self._equippedTemplate = equippedTemplate
+        self._equippedTemplate.Visible = false
+    end
+
     self._inventoryRefs = {
         Panel = inventoryPanel,
         Slots = slotsFrame,
+        EquippedSection = equippedFrame,
         YouLabel = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Inv", "You" }, true),
         EquipBest = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Inv", "EquipBest", "EquipBest" }, true),
         ReadyButton = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "ReadyButton" }, true),
         ReadyLabel = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "ReadyButton", "Equip" }, true),
+        ReadyButtonBG = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "ReadyButton", "BG" }, true)
+            or findFirstDescendantByName(SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "ReadyButton" }, true), "BG", "GuiObject"),
         DetailItem = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "Item" }, true),
         DetailName = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "Label02", "ItemName" }, true),
         DetailRarity = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "Label01", "Rearity" }, true)
             or SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "Label01", "Rarity" }, true),
+        DetailAmount = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "AmountText" }, true),
         DetailDamage = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "Information", "DamageFrame", "Damage" }, true),
         DetailHealth = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "Information", "HealthFrame", "Health" }, true),
     }
@@ -525,10 +617,12 @@ function UIController:_updateInventoryDetail(entry, equippedItemLookup)
 
     local item = entry and entry.Item
     local isEquipped = entry and equippedItemLookup and equippedItemLookup[entry.Id] == true
+    local availableCount = entry and entry.Count or 0
 
     setImage(refs.DetailItem, item and item.Icon or "")
     setText(refs.DetailName, item and getItemDisplayName(item) or "No Item")
     setText(refs.DetailRarity, item and tostring(item.Rarity or "") or "")
+    setText(refs.DetailAmount, string.format("x%s", FormatUtil.Number(availableCount)))
     setText(refs.DetailDamage, formatSignedStat(item and (item.Damage or item.RewardCoins or 0) or 0))
     setText(refs.DetailHealth, formatSignedStat(item and (item.Health or item.RewardHealth or 0) or 0))
     if refs.DetailRarity and refs.DetailRarity:IsA("TextLabel") then
@@ -539,12 +633,13 @@ function UIController:_updateInventoryDetail(entry, equippedItemLookup)
         if not entry then
             refs.ReadyLabel.Text = "Equip"
         elseif isEquipped then
-            refs.ReadyLabel.Text = "Equipped"
+            refs.ReadyLabel.Text = "Unequip"
         else
             refs.ReadyLabel.Text = "Equip"
         end
     end
 
+    self:_updateReadyButtonStyle(isEquipped == true)
 end
 
 function UIController:_updateInventory(snapshot)
@@ -563,25 +658,44 @@ function UIController:_updateInventory(snapshot)
         end
     end
     local equippedItemLookup = {}
+    local equippedItemCounts = {}
     for _, equippedId in ipairs(equippedItemIds) do
         equippedItemLookup[equippedId] = true
+        equippedItemCounts[equippedId] = (equippedItemCounts[equippedId] or 0) + 1
     end
     local inventoryState = snapshot.Inventory or {}
-    local entries = {}
+    local entriesById = {}
     for itemId, amount in pairs(inventoryState) do
         if type(itemId) == "string" and type(amount) == "number" and amount > 0 then
             local resolvedItem = self:_resolveRollItem({ Id = itemId })
             if resolvedItem then
-                table.insert(entries, {
+                entriesById[itemId] = {
                     Id = itemId,
                     Count = amount,
+                    EquippedCount = equippedItemCounts[itemId] or 0,
                     Item = resolvedItem,
-                })
+                }
             end
         end
     end
 
-    table.sort(entries, function(left, right)
+    for itemId, equippedCount in pairs(equippedItemCounts) do
+        if not entriesById[itemId] then
+            local resolvedItem = self:_resolveRollItem({ Id = itemId })
+            if resolvedItem then
+                entriesById[itemId] = {
+                    Id = itemId,
+                    Count = 0,
+                    EquippedCount = equippedCount,
+                    Item = resolvedItem,
+                }
+            end
+        elseif entriesById[itemId] then
+            entriesById[itemId].EquippedCount = equippedCount
+        end
+    end
+
+    local function compareEntries(left, right)
         local leftOrder = getRarityOrder(left.Item and left.Item.Rarity)
         local rightOrder = getRarityOrder(right.Item and right.Item.Rarity)
         if leftOrder ~= rightOrder then
@@ -591,7 +705,29 @@ function UIController:_updateInventory(snapshot)
             return left.Count > right.Count
         end
         return getItemDisplayName(left.Item) < getItemDisplayName(right.Item)
-    end)
+    end
+
+    local entries = {}
+    for _, entry in pairs(entriesById) do
+        if entry.Count > 0 then
+            table.insert(entries, entry)
+        end
+    end
+    table.sort(entries, compareEntries)
+
+    local equippedEntries = {}
+    for _, entry in pairs(entriesById) do
+        for slotIndex = 1, entry.EquippedCount or 0 do
+            table.insert(equippedEntries, {
+                Id = entry.Id,
+                Count = entry.Count,
+                EquippedCount = entry.EquippedCount,
+                Item = entry.Item,
+                SlotIndex = slotIndex,
+            })
+        end
+    end
+    table.sort(equippedEntries, compareEntries)
 
     local runtimeSlotsToDestroy = {}
     for _, child in ipairs(slotsFrame:GetChildren()) do
@@ -603,11 +739,30 @@ function UIController:_updateInventory(snapshot)
         runtimeSlot:Destroy()
     end
 
+    local equippedSection = refs.EquippedSection
+    local equippedTemplate = self._equippedTemplate
+    if equippedSection and equippedTemplate then
+        local runtimeEquippedToDestroy = {}
+        for _, child in ipairs(equippedSection:GetChildren()) do
+            if (child:IsA("Frame") or child:IsA("TextButton") or child:IsA("ImageButton")) and child:GetAttribute("RuntimeEquippedSlot") == true then
+                table.insert(runtimeEquippedToDestroy, child)
+            end
+        end
+        for _, runtimeSlot in ipairs(runtimeEquippedToDestroy) do
+            runtimeSlot:Destroy()
+        end
+    end
+
     local selectedId = self._inventorySelectedItemId
     local selectedEntry = nil
     local firstEntry = entries[1]
-    if not selectedId and firstEntry then
-        selectedId = firstEntry.Id
+    local firstEquippedEntry = equippedEntries[1]
+    if not selectedId then
+        if firstEntry then
+            selectedId = firstEntry.Id
+        elseif firstEquippedEntry then
+            selectedId = firstEquippedEntry.Id
+        end
     end
 
     for index, entry in ipairs(entries) do
@@ -622,13 +777,19 @@ function UIController:_updateInventory(snapshot)
             { "Label02", "ItemName" },
             { "Label02", "Main" },
         })
+        local amountLabel = findLabel(slot, {
+            { "AmountText" },
+            { "Amount" },
+            { "Stock" },
+        })
         local rarityLabel = findLabel(slot, {
             { "Label01", "Rearity" },
             { "Label01", "Rarity" },
             { "Label01", "Main" },
         })
         local itemImage = SafeWait.FindPath(slot, { "Item" }, true)
-        setText(nameLabel, string.format("%s x%s", getItemDisplayName(entry.Item), FormatUtil.Number(entry.Count)))
+        setText(nameLabel, getItemDisplayName(entry.Item))
+        setText(amountLabel, string.format("x%s", FormatUtil.Number(entry.Count)))
         setText(rarityLabel, tostring(entry.Item.Rarity or ""))
         setImage(itemImage, tostring(entry.Item.Icon or ""))
 
@@ -637,15 +798,83 @@ function UIController:_updateInventory(snapshot)
         end
 
         local equippedStroke = self:_ensureInventorySlotStroke(slot)
-        equippedStroke.Transparency = equippedItemLookup[entry.Id] and 0 or 1
+        equippedStroke.Transparency = entry.Id == selectedId and 0 or 1
 
         self._trove:Connect(slot.Activated, function()
             self._inventorySelectedItemId = entry.Id
-            self:_updateInventoryDetail(entry, equippedItemLookup)
+            if self._snapshot then
+                self:_updateInventory(self._snapshot)
+            else
+                self:_updateInventoryDetail(entry, equippedItemLookup)
+            end
         end)
 
         if entry.Id == selectedId then
             selectedEntry = entry
+        end
+    end
+
+    if equippedSection and equippedTemplate then
+        for index, entry in ipairs(equippedEntries) do
+            local slot = equippedTemplate:Clone()
+            slot.Name = string.format("RuntimeEquippedSlot_%02d", index)
+            slot:SetAttribute("RuntimeEquippedSlot", true)
+            slot.Visible = true
+            slot.LayoutOrder = index
+            slot.Parent = equippedSection
+
+            local nameLabel = findLabel(slot, {
+                { "Label02", "ItemName" },
+                { "Label02", "Main" },
+            })
+            local amountLabel = findLabel(slot, {
+                { "AmountText" },
+                { "Amount" },
+                { "Stock" },
+            })
+            local rarityLabel = findLabel(slot, {
+                { "Label01", "Rearity" },
+                { "Label01", "Rarity" },
+                { "Label01", "Main" },
+            })
+            local itemImage = SafeWait.FindPath(slot, { "Item" }, true)
+            setText(nameLabel, getItemDisplayName(entry.Item))
+            setText(amountLabel, "")
+            setText(rarityLabel, tostring(entry.Item.Rarity or ""))
+            setImage(itemImage, tostring(entry.Item.Icon or ""))
+
+            if rarityLabel and rarityLabel:IsA("TextLabel") then
+                rarityLabel.TextColor3 = getRarityColor(entry.Item.Rarity)
+            end
+
+            local equippedStroke = self:_ensureInventorySlotStroke(slot)
+            equippedStroke.Transparency = entry.Id == selectedId and 0 or 1
+
+            if slot:IsA("GuiButton") then
+                self._trove:Connect(slot.Activated, function()
+                    self._inventorySelectedItemId = entry.Id
+                    if self._snapshot then
+                        self:_updateInventory(self._snapshot)
+                    else
+                        self:_updateInventoryDetail(entry, equippedItemLookup)
+                    end
+                end)
+            elseif slot:IsA("GuiObject") then
+                self._trove:Connect(slot.InputBegan, function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                        self._inventorySelectedItemId = entry.Id
+                        if self._snapshot then
+                            self:_updateInventory(self._snapshot)
+                        else
+                            self:_updateInventoryDetail(entry, equippedItemLookup)
+                        end
+                    end
+                end)
+            end
+
+            if not selectedEntry and entry.Id == selectedId then
+                selectedEntry = entriesById[entry.Id] or entry
+            end
         end
     end
 
