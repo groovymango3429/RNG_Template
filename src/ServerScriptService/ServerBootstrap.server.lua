@@ -75,6 +75,9 @@ MonetizationService:SetDispatch(pushState, notify)
 
 local function onPlayerAdded(player)
     local _, isFallback = DataService:LoadProfile(player)
+    DataService:UpdateProfile(player, function(activeProfile)
+        activeProfile.Settings.AutoRoll = false
+    end)
     MonetizationService:LoadPlayer(player)
     pushState(player)
 
