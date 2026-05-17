@@ -6,6 +6,8 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
 
 local DeveloperProducts = require(Config:WaitForChild("DeveloperProducts"))
+local Rarities = require(Config:WaitForChild("Rarities"))
+local RollConfig = require(Config:WaitForChild("RollConfig"))
 local UIConfig = require(Config:WaitForChild("UIConfig"))
 
 local ServerFolder = script.Parent:WaitForChild("Server")
@@ -17,6 +19,53 @@ local RNGService = require(Services:WaitForChild("RNGService"))
 local RebirthService = require(Services:WaitForChild("RebirthService"))
 local RemoteService = require(Services:WaitForChild("RemoteService"))
 local RewardService = require(Services:WaitForChild("RewardService"))
+
+local rollLookup = {}
+for _, item in ipairs(RollConfig) do
+    if item and item.Id then
+        rollLookup[item.Id] = item
+    end
+end
+
+local function compareItemsForEquip(leftItem, rightItem)
+    local leftRarity = leftItem and Rarities[leftItem.Rarity]
+    local rightRarity = rightItem and Rarities[rightItem.Rarity]
+    local leftOrder = leftRarity and leftRarity.Order or 0
+    local rightOrder = rightRarity and rightRarity.Order or 0
+    if leftOrder ~= rightOrder then
+        return leftOrder > rightOrder
+    end
+
+    local leftCoins = leftItem and leftItem.RewardCoins or 0
+    local rightCoins = rightItem and rightItem.RewardCoins or 0
+    if leftCoins ~= rightCoins then
+        return leftCoins > rightCoins
+    end
+
+    local leftName = tostring(leftItem and (leftItem.DisplayName or leftItem.Id) or "")
+    local rightName = tostring(rightItem and (rightItem.DisplayName or rightItem.Id) or "")
+    return leftName < rightName
+end
+
+local function resolveBestOwnedItemId(profile)
+    local bestId = nil
+    local bestItem = nil
+    local inventory = profile and profile.Inventory
+    if type(inventory) ~= "table" then
+        return nil
+    end
+
+    for itemId, amount in pairs(inventory) do
+        if type(itemId) == "string" and type(amount) == "number" and amount > 0 then
+            local candidate = rollLookup[itemId]
+            if candidate and (not bestItem or compareItemsForEquip(candidate, bestItem)) then
+                bestItem = candidate
+                bestId = itemId
+            end
+        end
+    end
+    return bestId
+end
 
 RemoteService:Init()
 DataService:Init()
@@ -51,6 +100,7 @@ local function buildSnapshot(player)
             AutoRoll = profile.Settings.AutoRoll,
         },
         Inventory = profile.Inventory,
+        EquippedItemId = profile.EquippedItemId,
         Index = profile.Index,
         Rewards = {
             Daily = RewardService:GetDailyState(player),
@@ -176,6 +226,60 @@ RemoteService:Get("RequestRebirth").OnServerInvoke = function(player)
     pushState(player)
     notify(player, "Rebirth complete.", "Success")
     return { Success = true, State = state }
+end
+
+RemoteService:Get("RequestEquipItem").OnServerInvoke = function(player, itemId)
+    if type(itemId) ~= "string" or itemId == "" then
+        return { Success = false, Message = "Invalid item." }
+    end
+
+    local item = rollLookup[itemId]
+    if not item then
+        return { Success = false, Message = "Item not found." }
+    end
+
+    local didEquip = false
+    local profile = DataService:UpdateProfile(player, function(activeProfile)
+        local owned = (activeProfile.Inventory and activeProfile.Inventory[itemId]) or 0
+        if owned <= 0 then
+            return
+        end
+        activeProfile.EquippedItemId = itemId
+        didEquip = true
+    end)
+
+    if not profile then
+        return { Success = false, Message = "Profile not loaded." }
+    end
+
+    if not didEquip then
+        return { Success = false, Message = "You do not own this item." }
+    end
+
+    pushState(player)
+    return { Success = true, EquippedItemId = profile.EquippedItemId }
+end
+
+RemoteService:Get("RequestEquipBestItem").OnServerInvoke = function(player)
+    local equippedBestId = nil
+    local profile = DataService:UpdateProfile(player, function(activeProfile)
+        local bestId = resolveBestOwnedItemId(activeProfile)
+        if bestId then
+            activeProfile.EquippedItemId = bestId
+            equippedBestId = bestId
+        end
+    end)
+
+    if not profile then
+        return { Success = false, Message = "Profile not loaded." }
+    end
+
+    if type(equippedBestId) ~= "string" or equippedBestId == "" then
+        return { Success = false, Message = "No item available to equip." }
+    end
+
+    pushState(player)
+    return { Success = true, EquippedItemId = equippedBestId }
 end
 
 RemoteService:Get("PromptGamepassPurchase").OnServerInvoke = function(player, key)

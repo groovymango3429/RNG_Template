@@ -36,6 +36,7 @@ local INDEX_ZONE_BY_BUTTON = {
     Btn05 = "Vulcan",
     Btn06 = "Rainbow",
 }
+local INVENTORY_EQUIPPED_COLOR = Color3.fromRGB(110, 224, 122)
 
 local function setText(instance, text)
     if instance and instance:IsA("TextLabel") then
@@ -184,6 +185,9 @@ function UIController.new(remotes, notifier)
     self._indexTemplateButtons = {}
     self._indexTemplatesByRarity = {}
     self._indexFallbackTemplate = nil
+    self._inventoryTemplate = nil
+    self._inventorySelectedItemId = nil
+    self._inventoryRefs = nil
 
     if self._ui then
         for _, panelName in ipairs(UIConfig.Panels) do
@@ -195,6 +199,7 @@ function UIController.new(remotes, notifier)
         self:_bindCloseButtons()
         self:_bindRewardButtons()
         self:_captureRewardsPanelLayout()
+        self:_setupInventoryUI()
     end
 
     self:_setupRollingUI()
@@ -388,12 +393,16 @@ end
 
 function UIController:_bindCloseButtons()
     for panelName, path in pairs(UIConfig.CloseButtons) do
-        local button = self._ui and SafeWait.FindPath(self._ui, path)
+        local panel = self._panels[panelName]
+        local button = self._ui and SafeWait.FindPath(self._ui, path, true)
+        if not button and panel then
+            button = SafeWait.FindPath(panel, path, true)
+        end
         if button and button:IsA("GuiButton") then
+            local panelToClose = panel
             self._trove:Connect(button.Activated, function()
-                local panel = self._panels[panelName]
-                if panel then
-                    panel.Visible = false
+                if panelToClose then
+                    setPanelVisible(panelToClose, false)
                 end
             end)
         end
@@ -431,6 +440,202 @@ function UIController:_bindRewardButtons()
                 end
             end)
         end
+    end
+end
+
+function UIController:_ensureInventorySlotStroke(slot)
+    local stroke = slot:FindFirstChild("EquippedStroke")
+    if not stroke or not stroke:IsA("UIStroke") then
+        stroke = Instance.new("UIStroke")
+        stroke.Name = "EquippedStroke"
+        stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        stroke.Thickness = 2
+        stroke.Transparency = 1
+        stroke.Parent = slot
+    end
+    stroke.Color = INVENTORY_EQUIPPED_COLOR
+    return stroke
+end
+
+function UIController:_setupInventoryUI()
+    local inventoryPanel = self._panels.InvUI
+    if not inventoryPanel then
+        return
+    end
+
+    local slotsFrame = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Inv", "Content", "Slots1" }, true)
+    local slotTemplate = slotsFrame and SafeWait.FindPath(slotsFrame, { "Slot1" }, true)
+    if slotTemplate and (slotTemplate:IsA("TextButton") or slotTemplate:IsA("ImageButton")) then
+        self._inventoryTemplate = slotTemplate
+        self._inventoryTemplate.Visible = false
+    end
+
+    self._inventoryRefs = {
+        Panel = inventoryPanel,
+        Slots = slotsFrame,
+        YouLabel = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Inv", "You" }, true),
+        EquipBest = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Inv", "EquipBest", "EquipBest" }, true),
+        ReadyButton = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "ReadyButton" }, true),
+        ReadyLabel = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "ReadyButton", "Equip" }, true),
+        DetailItem = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "Item" }, true),
+        DetailName = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "Label02", "ItemName" }, true),
+        DetailRarity = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "Label01", "Rearity" }, true)
+            or SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "Label01", "Rarity" }, true),
+        DetailDamage = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "Information", "DamageFrame", "Damage" }, true),
+        DetailHealth = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "Information", "HealthFrame", "Health" }, true),
+    }
+
+    local equipBestButton = self._inventoryRefs.EquipBest
+    if equipBestButton and equipBestButton:IsA("GuiButton") then
+        self._trove:Connect(equipBestButton.Activated, function()
+            local result = self:_invoke("RequestEquipBestItem")
+            if result and not result.Success and result.Message then
+                self._notifier:Show({ Kind = "Warning", Message = result.Message })
+            end
+        end)
+    end
+
+    local readyButton = self._inventoryRefs.ReadyButton
+    if readyButton and readyButton:IsA("GuiButton") then
+        self._trove:Connect(readyButton.Activated, function()
+            if not self._inventorySelectedItemId then
+                return
+            end
+            local result = self:_invoke("RequestEquipItem", self._inventorySelectedItemId)
+            if result and not result.Success and result.Message then
+                self._notifier:Show({ Kind = "Warning", Message = result.Message })
+            end
+        end)
+    end
+end
+
+function UIController:_updateInventoryDetail(entry, equippedItemId)
+    local refs = self._inventoryRefs
+    if not refs then
+        return
+    end
+
+    local item = entry and entry.Item
+    local isEquipped = entry and entry.Id == equippedItemId
+
+    setImage(refs.DetailItem, item and item.Icon or "")
+    setText(refs.DetailName, item and getItemDisplayName(item) or "No Item")
+    setText(refs.DetailRarity, item and tostring(item.Rarity or "") or "")
+    setText(refs.DetailDamage, FormatUtil.Number(item and (item.Damage or item.RewardCoins or 0) or 0))
+    setText(refs.DetailHealth, FormatUtil.Number(item and (item.Health or item.RewardHealth or 0) or 0))
+
+    if refs.ReadyLabel and refs.ReadyLabel:IsA("TextLabel") then
+        if not entry then
+            refs.ReadyLabel.Text = "Equip"
+        elseif isEquipped then
+            refs.ReadyLabel.Text = "Equipped"
+        else
+            refs.ReadyLabel.Text = "Equip"
+        end
+    end
+
+end
+
+function UIController:_updateInventory(snapshot)
+    local refs = self._inventoryRefs
+    local slotsFrame = refs and refs.Slots
+    local slotTemplate = self._inventoryTemplate
+    if not refs or not slotsFrame or not slotTemplate then
+        return
+    end
+
+    local equippedItemId = snapshot.EquippedItemId
+    local inventoryState = snapshot.Inventory or {}
+    local entries = {}
+    local totalCount = 0
+    for itemId, amount in pairs(inventoryState) do
+        if type(itemId) == "string" and type(amount) == "number" and amount > 0 then
+            local resolvedItem = self:_resolveRollItem({ Id = itemId })
+            if resolvedItem then
+                totalCount += amount
+                table.insert(entries, {
+                    Id = itemId,
+                    Count = amount,
+                    Item = resolvedItem,
+                })
+            end
+        end
+    end
+
+    table.sort(entries, function(left, right)
+        local leftOrder = getRarityOrder(left.Item and left.Item.Rarity)
+        local rightOrder = getRarityOrder(right.Item and right.Item.Rarity)
+        if leftOrder ~= rightOrder then
+            return leftOrder > rightOrder
+        end
+        if left.Count ~= right.Count then
+            return left.Count > right.Count
+        end
+        return getItemDisplayName(left.Item) < getItemDisplayName(right.Item)
+    end)
+
+    local runtimeSlotsToDestroy = {}
+    for _, child in ipairs(slotsFrame:GetChildren()) do
+        if (child:IsA("TextButton") or child:IsA("ImageButton")) and child:GetAttribute("RuntimeInventorySlot") == true then
+            table.insert(runtimeSlotsToDestroy, child)
+        end
+    end
+    for _, runtimeSlot in ipairs(runtimeSlotsToDestroy) do
+        runtimeSlot:Destroy()
+    end
+
+    local selectedId = self._inventorySelectedItemId
+    local selectedEntry = nil
+    local firstEntry = entries[1]
+    if not selectedId and firstEntry then
+        selectedId = firstEntry.Id
+    end
+
+    for index, entry in ipairs(entries) do
+        local slot = slotTemplate:Clone()
+        slot.Name = string.format("RuntimeInventorySlot_%02d", index)
+        slot:SetAttribute("RuntimeInventorySlot", true)
+        slot.Visible = true
+        slot.LayoutOrder = index
+        slot.Parent = slotsFrame
+
+        local nameLabel = findLabel(slot, {
+            { "Label02", "ItemName" },
+            { "Label02", "Main" },
+        })
+        local rarityLabel = findLabel(slot, {
+            { "Label01", "Rearity" },
+            { "Label01", "Rarity" },
+            { "Label01", "Main" },
+        })
+        local itemImage = SafeWait.FindPath(slot, { "Item" }, true)
+        setText(nameLabel, string.format("%s x%s", getItemDisplayName(entry.Item), FormatUtil.Number(entry.Count)))
+        setText(rarityLabel, tostring(entry.Item.Rarity or ""))
+        setImage(itemImage, tostring(entry.Item.Icon or ""))
+
+        local rarityStroke = rarityLabel and rarityLabel:FindFirstChildOfClass("UIStroke")
+        if rarityStroke then
+            rarityStroke.Color = getRarityColor(entry.Item.Rarity)
+        end
+
+        local equippedStroke = self:_ensureInventorySlotStroke(slot)
+        equippedStroke.Transparency = (entry.Id == equippedItemId) and 0 or 1
+
+        self._trove:Connect(slot.Activated, function()
+            self._inventorySelectedItemId = entry.Id
+            self:_updateInventoryDetail(entry, equippedItemId)
+        end)
+
+        if entry.Id == selectedId then
+            selectedEntry = entry
+        end
+    end
+
+    self._inventorySelectedItemId = selectedEntry and selectedEntry.Id or nil
+    self:_updateInventoryDetail(selectedEntry, equippedItemId)
+
+    if refs.YouLabel and refs.YouLabel:IsA("TextLabel") then
+        refs.YouLabel.Text = string.format("You (%s)", FormatUtil.Number(totalCount))
     end
 end
 
@@ -1254,6 +1459,7 @@ function UIController:ApplySnapshot(snapshot)
     self:_updatePlaytimeRewards(snapshot.Rewards and snapshot.Rewards.Playtime)
     self:_updateDiscover(snapshot.Progression and snapshot.Progression.Discover)
     self:_updateIndex(snapshot)
+    self:_updateInventory(snapshot)
     self:_updateRebirth(snapshot)
     self:_updateRewardPanel(snapshot)
     self:_updateAutoRollState(snapshot)

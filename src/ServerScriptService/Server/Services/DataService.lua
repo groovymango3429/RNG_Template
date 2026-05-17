@@ -33,6 +33,7 @@ local function buildDefaultProfile(userId: number)
             AutoRoll = false,
         },
         Inventory = {} :: {[string]: number},
+        EquippedItemId = nil :: string?,
         Index = {} :: {[string]: boolean},
         Rewards = {
             Daily = {
