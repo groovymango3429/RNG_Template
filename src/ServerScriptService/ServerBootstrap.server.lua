@@ -278,11 +278,6 @@ RemoteService:Get("RequestEquipBestItem").OnServerInvoke = function(player)
         return { Success = false, Message = "No item available to equip." }
     end
 
-    local ownedCount = (profile.Inventory and profile.Inventory[equippedBestId]) or 0
-    if ownedCount <= 0 then
-        return { Success = false, Message = "No item available to equip." }
-    end
-
     pushState(player)
     return { Success = true, EquippedItemId = equippedBestId }
 end

@@ -622,7 +622,7 @@ function UIController:_updateInventory(snapshot)
 
         self._trove:Connect(slot.Activated, function()
             self._inventorySelectedItemId = entry.Id
-            self:_updateInventory(snapshot)
+            self:_updateInventoryDetail(entry, equippedItemId)
         end)
 
         if entry.Id == selectedId then
