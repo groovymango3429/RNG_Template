@@ -77,7 +77,7 @@ local function resolveBestOwnedItemIds(profile, limit)
         return left.Id < right.Id
     end)
 
-    local capped = math.max(1, math.floor(limit or MAX_EQUIPPED_ITEMS))
+    local capped = math.max(0, math.floor(limit or MAX_EQUIPPED_ITEMS))
     local result = {}
     for index = 1, math.min(#available, capped) do
         table.insert(result, available[index].Id)
