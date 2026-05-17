@@ -23,6 +23,9 @@ UIController.__index = UIController
 local INVALID_ASSET_ID = "rbxassetid://0"
 local MIN_FADE_RANGE = 0.01
 local AUTO_ROLL_DELAY_SECONDS = 0.05
+local LOCKED_INDEX_TEXT_TRANSPARENCY = 0
+local LOCKED_INDEX_TEXT_STROKE_TRANSPARENCY = 0.25
+local LOCKED_INDEX_TEXT_ZINDEX_OFFSET = 2
 -- Runtime-generated rolling frames use this name pattern and are cleaned on setup.
 local RUNTIME_ROLLING_SLOT_NAME_PATTERN = "^RollingSlot%d+$"
 local INDEX_ZONE_BY_BUTTON = {
@@ -1083,9 +1086,9 @@ function UIController:_updateIndex(snapshot)
             local owned = snapshot.Index and snapshot.Index[item.Id] == true
             setText(nameLabel, owned and getItemDisplayName(item) or "???")
             if nameLabel and not owned then
-                nameLabel.TextTransparency = 0
-                nameLabel.TextStrokeTransparency = 0.25
-                nameLabel.ZIndex = math.max(nameLabel.ZIndex, button.ZIndex + 2)
+                nameLabel.TextTransparency = LOCKED_INDEX_TEXT_TRANSPARENCY
+                nameLabel.TextStrokeTransparency = LOCKED_INDEX_TEXT_STROKE_TRANSPARENCY
+                nameLabel.ZIndex = math.max(nameLabel.ZIndex, button.ZIndex + LOCKED_INDEX_TEXT_ZINDEX_OFFSET)
             end
             button.AutoButtonColor = owned
         end
