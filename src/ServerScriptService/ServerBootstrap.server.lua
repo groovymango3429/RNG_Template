@@ -256,10 +256,6 @@ RemoteService:Get("RequestEquipItem").OnServerInvoke = function(player, itemId)
         return { Success = false, Message = "You do not own this item." }
     end
 
-    if profile.EquippedItemId ~= itemId then
-        return { Success = false, Message = "Could not equip item." }
-    end
-
     pushState(player)
     return { Success = true, EquippedItemId = profile.EquippedItemId }
 end

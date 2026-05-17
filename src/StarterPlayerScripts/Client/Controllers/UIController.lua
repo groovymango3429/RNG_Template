@@ -478,7 +478,8 @@ function UIController:_setupInventoryUI()
         ReadyLabel = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "ReadyButton", "Equip" }, true),
         DetailItem = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "Item" }, true),
         DetailName = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "Label02", "ItemName" }, true),
-        DetailRarity = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "Label01", "Rearity" }, true),
+        DetailRarity = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "Label01", "Rearity" }, true)
+            or SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "Label01", "Rarity" }, true),
         DetailDamage = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "Information", "DamageFrame", "Damage" }, true),
         DetailHealth = SafeWait.FindPath(inventoryPanel, { "HolderFrame", "Frame", "Information", "HealthFrame", "Health" }, true),
     }
@@ -603,6 +604,7 @@ function UIController:_updateInventory(snapshot)
         })
         local rarityLabel = findLabel(slot, {
             { "Label01", "Rearity" },
+            { "Label01", "Rarity" },
             { "Label01", "Main" },
         })
         local itemImage = SafeWait.FindPath(slot, { "Item" }, true)

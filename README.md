@@ -136,7 +136,7 @@ Top-level objects expected under `YourUiPack!`:
 - `Rebirth.Content.Btns.RebirthBtn` - attempts a rebirth.
 - `Rebirth.Content.Btns.SkipRebirthBtn` - prompts the configured skip rebirth developer product.
 - `InvUI.HolderFrame.Inv.Header.CloseBtn` - closes inventory.
-- `InvUI.HolderFrame.Inv.Content.Slots1` - receives runtime inventory slots cloned from `Slot1`.
+- `InvUI.HolderFrame.Inv.Content.Slots1` - receives runtime inventory slots cloned from `Slots1.Slot1` (template child button).
 - `InvUI.HolderFrame.Frame.ReadyButton` - equips the currently selected inventory item.
 - `InvUI.HolderFrame.Inv.EquipBest.EquipBest` - equips the best owned inventory item.
 
