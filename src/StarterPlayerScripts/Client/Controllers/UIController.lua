@@ -95,7 +95,8 @@ local function findFirstDescendantByNamesInsensitive(root, names, className)
     end
 
     for _, descendant in ipairs(root:GetDescendants()) do
-        if (className == nil or descendant:IsA(className)) and lookup[string.lower(descendant.Name)] then
+        local lowercaseName = string.lower(descendant.Name)
+        if (className == nil or descendant:IsA(className)) and lookup[lowercaseName] then
             return descendant
         end
     end
