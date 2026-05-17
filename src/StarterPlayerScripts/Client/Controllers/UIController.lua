@@ -399,9 +399,10 @@ function UIController:_bindCloseButtons()
             button = SafeWait.FindPath(panel, path, true)
         end
         if button and button:IsA("GuiButton") then
+            local panelToClose = panel
             self._trove:Connect(button.Activated, function()
-                if panel then
-                    setPanelVisible(panel, false)
+                if panelToClose then
+                    setPanelVisible(panelToClose, false)
                 end
             end)
         end
