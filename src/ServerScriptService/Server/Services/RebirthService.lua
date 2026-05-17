@@ -28,6 +28,7 @@ function RebirthService:GetState(player)
         CurrentShards = currentShards,
         NextRequiredShards = requiredShards,
         NextBonusShards = nextBonusShards,
+        -- Legacy aliases kept to avoid breaking older clients.
         CurrentRolls = currentShards,
         NextRequiredRolls = requiredShards,
         NextBonusGems = nextBonusShards,
