@@ -28,6 +28,60 @@ for _, item in ipairs(RollConfig) do
     end
 end
 
+local function isValidItemId(itemId)
+    return type(itemId) == "string" and itemId ~= "" and rollLookup[itemId] ~= nil
+end
+
+local function copyInventoryCounts(inventory)
+    local counts = {}
+    if type(inventory) ~= "table" then
+        return counts
+    end
+
+    for itemId, amount in pairs(inventory) do
+        if isValidItemId(itemId) and type(amount) == "number" then
+            local roundedAmount = math.max(0, math.floor(amount))
+            if roundedAmount > 0 then
+                counts[itemId] = roundedAmount
+            end
+        end
+    end
+
+    return counts
+end
+
+local function buildTotalOwnedCounts(profile)
+    local counts = copyInventoryCounts(profile and profile.Inventory)
+
+    if type(profile and profile.EquippedItemIds) == "table" then
+        for _, itemId in ipairs(profile.EquippedItemIds) do
+            if isValidItemId(itemId) then
+                counts[itemId] = (counts[itemId] or 0) + 1
+            end
+        end
+    elseif isValidItemId(profile and profile.EquippedItemId) then
+        counts[profile.EquippedItemId] = (counts[profile.EquippedItemId] or 0) + 1
+    end
+
+    return counts
+end
+
+local function applyOwnedState(profile, totalOwnedCounts, equippedIds)
+    local availableCounts = copyInventoryCounts(totalOwnedCounts)
+    for _, itemId in ipairs(equippedIds) do
+        if isValidItemId(itemId) and type(availableCounts[itemId]) == "number" and availableCounts[itemId] > 0 then
+            availableCounts[itemId] -= 1
+            if availableCounts[itemId] <= 0 then
+                availableCounts[itemId] = nil
+            end
+        end
+    end
+
+    profile.Inventory = availableCounts
+    profile.EquippedItemIds = equippedIds
+    profile.EquippedItemId = equippedIds[1]
+end
+
 local function compareItemsForEquip(leftItem, rightItem)
     local leftRarity = leftItem and Rarities[leftItem.Rarity]
     local rightRarity = rightItem and Rarities[rightItem.Rarity]
@@ -50,19 +104,18 @@ end
 
 local function resolveBestOwnedItemIds(profile, limit)
     local available = {}
-    local inventory = profile and profile.Inventory
-    if type(inventory) ~= "table" then
-        return {}
-    end
+    local inventory = buildTotalOwnedCounts(profile)
 
     for itemId, amount in pairs(inventory) do
         if type(itemId) == "string" and type(amount) == "number" and amount > 0 then
             local candidate = rollLookup[itemId]
             if candidate then
-                table.insert(available, {
-                    Id = itemId,
-                    Item = candidate,
-                })
+                for _ = 1, amount do
+                    table.insert(available, {
+                        Id = itemId,
+                        Item = candidate,
+                    })
+                end
             end
         end
     end
@@ -86,24 +139,12 @@ local function resolveBestOwnedItemIds(profile, limit)
 end
 
 local function normalizeEquippedItemIds(profile)
-    local inventory = profile and profile.Inventory
     local equippedIds = {}
-    local seen = {}
-
-    local function canUse(itemId)
-        return type(itemId) == "string"
-            and itemId ~= ""
-            and type(inventory) == "table"
-            and type(inventory[itemId]) == "number"
-            and inventory[itemId] > 0
-            and rollLookup[itemId] ~= nil
-    end
 
     if type(profile and profile.EquippedItemIds) == "table" then
         for _, itemId in ipairs(profile.EquippedItemIds) do
-            if canUse(itemId) and not seen[itemId] then
+            if isValidItemId(itemId) then
                 table.insert(equippedIds, itemId)
-                seen[itemId] = true
                 if #equippedIds >= MAX_EQUIPPED_ITEMS then
                     break
                 end
@@ -111,7 +152,7 @@ local function normalizeEquippedItemIds(profile)
         end
     end
 
-    if #equippedIds == 0 and canUse(profile and profile.EquippedItemId) then
+    if #equippedIds == 0 and isValidItemId(profile and profile.EquippedItemId) then
         table.insert(equippedIds, profile.EquippedItemId)
     end
 
@@ -181,7 +222,9 @@ local function onPlayerAdded(player)
     local profile, isFallback = DataService:LoadProfile(player)
     if profile then
         profile.Settings.AutoRoll = false
-        normalizeEquippedItemIds(profile)
+        local totalOwnedCounts = buildTotalOwnedCounts(profile)
+        local equippedIds = normalizeEquippedItemIds(profile)
+        applyOwnedState(profile, totalOwnedCounts, equippedIds)
         if profile.Meta.SaveMode ~= "Fallback" then
             DataService:MarkDirty(player)
         end
@@ -293,38 +336,47 @@ RemoteService:Get("RequestEquipItem").OnServerInvoke = function(player, itemId)
         return { Success = false, Message = "Item not found." }
     end
 
-    local didEquip = false
+    local didUpdate = false
+    local action = nil
+    local hitEquipLimit = false
     local updatedEquipped = nil
     local profile = DataService:UpdateProfile(player, function(activeProfile)
+        local totalOwnedCounts = buildTotalOwnedCounts(activeProfile)
+        local equippedIds = normalizeEquippedItemIds(activeProfile)
+        local equippedIndex = table.find(equippedIds, itemId)
+
+        if equippedIndex then
+            table.remove(equippedIds, equippedIndex)
+            applyOwnedState(activeProfile, totalOwnedCounts, equippedIds)
+            updatedEquipped = table.clone(equippedIds)
+            action = "Unequip"
+            didUpdate = true
+            return
+        end
+
         local owned = (activeProfile.Inventory and activeProfile.Inventory[itemId]) or 0
         if owned <= 0 then
             return
         end
-        local equippedIds = normalizeEquippedItemIds(activeProfile)
-        for _, equippedId in ipairs(equippedIds) do
-            if equippedId == itemId then
-                didEquip = true
-                updatedEquipped = equippedIds
-                return
-            end
-        end
+
         if #equippedIds >= MAX_EQUIPPED_ITEMS then
+            hitEquipLimit = true
             return
         end
+
         table.insert(equippedIds, itemId)
-        activeProfile.EquippedItemIds = equippedIds
-        activeProfile.EquippedItemId = equippedIds[1]
-        updatedEquipped = equippedIds
-        didEquip = true
+        applyOwnedState(activeProfile, totalOwnedCounts, equippedIds)
+        updatedEquipped = table.clone(equippedIds)
+        action = "Equip"
+        didUpdate = true
     end)
 
     if not profile then
         return { Success = false, Message = "Profile not loaded." }
     end
 
-    if not didEquip then
-        local equippedCount = profile and profile.EquippedItemIds and #profile.EquippedItemIds or 0
-        if equippedCount >= MAX_EQUIPPED_ITEMS then
+    if not didUpdate then
+        if hitEquipLimit then
             return { Success = false, Message = string.format("You can only equip %d pets.", MAX_EQUIPPED_ITEMS) }
         end
         return { Success = false, Message = "You do not own this item." }
@@ -333,6 +385,7 @@ RemoteService:Get("RequestEquipItem").OnServerInvoke = function(player, itemId)
     pushState(player)
     return {
         Success = true,
+        Action = action,
         EquippedItemId = profile.EquippedItemId,
         EquippedItemIds = updatedEquipped or normalizeEquippedItemIds(profile),
     }
@@ -341,11 +394,11 @@ end
 RemoteService:Get("RequestEquipBestItem").OnServerInvoke = function(player)
     local equippedBestIds = nil
     local profile = DataService:UpdateProfile(player, function(activeProfile)
+        local totalOwnedCounts = buildTotalOwnedCounts(activeProfile)
         local bestIds = resolveBestOwnedItemIds(activeProfile, MAX_EQUIPPED_ITEMS)
         if #bestIds > 0 then
-            activeProfile.EquippedItemIds = bestIds
-            activeProfile.EquippedItemId = bestIds[1]
-            equippedBestIds = bestIds
+            applyOwnedState(activeProfile, totalOwnedCounts, bestIds)
+            equippedBestIds = table.clone(bestIds)
         end
     end)
 

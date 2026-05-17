@@ -8,11 +8,67 @@ local Util = Shared:WaitForChild("Util")
 
 local DataConfig = require(Config:WaitForChild("DataConfig"))
 local TableUtil = require(Util:WaitForChild("TableUtil"))
+local CURRENT_SCHEMA_VERSION = 2
+
+local function normalizeInventory(inventory)
+    local normalized = {}
+    if type(inventory) ~= "table" then
+        return normalized
+    end
+
+    for itemId, amount in pairs(inventory) do
+        if type(itemId) == "string" and type(amount) == "number" then
+            local roundedAmount = math.max(0, math.floor(amount))
+            if roundedAmount > 0 then
+                normalized[itemId] = roundedAmount
+            end
+        end
+    end
+
+    return normalized
+end
+
+local function migrateProfile(profile)
+    local schemaVersion = tonumber(profile and profile.Meta and profile.Meta.SchemaVersion) or 0
+    if schemaVersion < CURRENT_SCHEMA_VERSION then
+        local inventory = normalizeInventory(profile.Inventory)
+        local equippedIds = {}
+
+        if type(profile.EquippedItemIds) == "table" then
+            for _, itemId in ipairs(profile.EquippedItemIds) do
+                if type(itemId) == "string" and itemId ~= "" then
+                    table.insert(equippedIds, itemId)
+                end
+            end
+        elseif type(profile.EquippedItemId) == "string" and profile.EquippedItemId ~= "" then
+            table.insert(equippedIds, profile.EquippedItemId)
+        end
+
+        for _, itemId in ipairs(equippedIds) do
+            local amount = inventory[itemId]
+            if type(amount) == "number" and amount > 0 then
+                amount -= 1
+                if amount > 0 then
+                    inventory[itemId] = amount
+                else
+                    inventory[itemId] = nil
+                end
+            end
+        end
+
+        profile.Inventory = inventory
+    else
+        profile.Inventory = normalizeInventory(profile.Inventory)
+    end
+
+    profile.Meta.SchemaVersion = CURRENT_SCHEMA_VERSION
+    return profile
+end
 
 local function buildDefaultProfile(userId: number)
     return {
         Meta = {
-            SchemaVersion = 1,
+            SchemaVersion = CURRENT_SCHEMA_VERSION,
             UserId = userId,
             SaveMode = "Normal",
             LastLoadAt = 0,
@@ -115,6 +171,7 @@ function DataService:LoadProfile(player)
     local success = self:_withRetries(function()
         self._store:UpdateAsync(key, function(current)
             current = TableUtil.Reconcile(current or {}, buildDefaultProfile(player.UserId))
+            current = migrateProfile(current)
             local session = current.Session or {}
             local now = os.time()
             local isLocked = session.JobId ~= nil
