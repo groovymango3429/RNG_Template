@@ -521,7 +521,7 @@ function UIController:_updateInventoryDetail(entry, equippedItemId)
     setImage(refs.DetailItem, item and item.Icon or "")
     setText(refs.DetailName, item and getItemDisplayName(item) or "No Item")
     setText(refs.DetailRarity, item and tostring(item.Rarity or "") or "")
-    setText(refs.DetailDamage, FormatUtil.Number(item and item.RewardCoins or 0))
+    setText(refs.DetailDamage, FormatUtil.Number(item and (item.Damage or item.RewardCoins or 0) or 0))
     setText(refs.DetailHealth, FormatUtil.Number(item and (item.Health or item.RewardHealth or 0) or 0))
 
     if refs.ReadyLabel and refs.ReadyLabel:IsA("TextLabel") then
