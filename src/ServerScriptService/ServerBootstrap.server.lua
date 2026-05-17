@@ -187,7 +187,9 @@ local function buildSnapshot(player)
         },
         Stats = {
             Coins = profile.Stats.Coins,
+            Cash = profile.Stats.Cash or profile.Stats.Coins,
             Gems = profile.Stats.Gems,
+            Shards = profile.Stats.Shards or profile.Stats.Gems,
             Rolls = profile.Stats.Rolls,
             Rebirths = profile.Stats.Rebirths,
             LuckMultiplier = RNGService:GetLuckMultiplier(player),

@@ -4,8 +4,10 @@ local RewardApplier = {}
 function RewardApplier.Apply(profile, reward)
     if reward.Type == "Coins" then
         profile.Stats.Coins = (profile.Stats.Coins or 0) + (reward.Amount or 0)
+        profile.Stats.Cash = profile.Stats.Coins
     elseif reward.Type == "Gems" then
-        profile.Stats.Gems = (profile.Stats.Gems or 0) + (reward.Amount or 0)
+        profile.Stats.Shards = (profile.Stats.Shards or profile.Stats.Gems or 0) + (reward.Amount or 0)
+        profile.Stats.Gems = profile.Stats.Shards
     elseif reward.Type == "LuckBoost" then
         local boost = profile.Boosts.Luck or { Amount = 0, ExpiresAt = 0 }
         boost.Amount = math.max(boost.Amount or 0, reward.Amount or 0)

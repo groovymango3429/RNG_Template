@@ -114,6 +114,7 @@ function RNGService:Roll(player)
     self._dataService:UpdateProfile(player, function(activeProfile)
         activeProfile.Stats.Rolls = (activeProfile.Stats.Rolls or 0) + 1
         activeProfile.Stats.Coins = (activeProfile.Stats.Coins or 0) + (chosenItem.RewardCoins or 0)
+        activeProfile.Stats.Cash = activeProfile.Stats.Coins
         activeProfile.Inventory[chosenItem.Id] = (activeProfile.Inventory[chosenItem.Id] or 0) + 1
         activeProfile.Index[chosenItem.Id] = true
     end)
