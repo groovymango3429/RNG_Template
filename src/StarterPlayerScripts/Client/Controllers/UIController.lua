@@ -1632,9 +1632,9 @@ function UIController:_updateRebirth(snapshot)
     })
     local fill = SafeWait.FindPath(rebirthPanel, { "Content", "Progress", "Bar", "Fill" })
 
-    local currentShards = rebirthState.CurrentShards or rebirthState.CurrentRolls or 0
-    local requiredShards = rebirthState.NextRequiredShards or rebirthState.NextRequiredRolls or 0
-    local nextBonusShards = rebirthState.NextBonusShards or rebirthState.NextBonusGems or 0
+    local currentShards = rebirthState.CurrentShards or 0
+    local requiredShards = rebirthState.NextRequiredShards or 0
+    local nextBonusShards = rebirthState.NextBonusShards or 0
     setText(currentLabel, string.format("Rebirths: %s", FormatUtil.Number(rebirthState.CurrentRebirths or 0)))
     setText(nextLabel, string.format("Next Bonus: %s Shards", FormatUtil.Number(nextBonusShards)))
     setText(progressLabel, string.format("%s / %s shards", FormatUtil.Number(currentShards), FormatUtil.Number(requiredShards)))
