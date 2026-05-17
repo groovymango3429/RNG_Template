@@ -9,6 +9,8 @@ return {
         ModelName = "LuckySlime",
         Icon = "rbxassetid://0",
         DisplayOdds = "1 in 2",
+        Damage = 2,
+        Health = 4,
         RewardCoins = 2,
     },
     {
@@ -20,6 +22,8 @@ return {
         ModelName = "CloverFox",
         Icon = "rbxassetid://0",
         DisplayOdds = "1 in 4",
+        Damage = 4,
+        Health = 8,
         RewardCoins = 4,
     },
     {
@@ -31,6 +35,8 @@ return {
         ModelName = "CandyComet",
         Icon = "rbxassetid://0",
         DisplayOdds = "1 in 8",
+        Damage = 8,
+        Health = 16,
         RewardCoins = 8,
     },
     {
@@ -42,6 +48,8 @@ return {
         ModelName = "SugarDrake",
         Icon = "rbxassetid://0",
         DisplayOdds = "1 in 15",
+        Damage = 16,
+        Health = 32,
         RewardCoins = 16,
     },
     {
@@ -53,6 +61,8 @@ return {
         ModelName = "SolarSprite",
         Icon = "rbxassetid://0",
         DisplayOdds = "1 in 10",
+        Damage = 14,
+        Health = 28,
         RewardCoins = 14,
     },
     {
@@ -64,6 +74,8 @@ return {
         ModelName = "GoldTitan",
         Icon = "rbxassetid://0",
         DisplayOdds = "1 in 30",
+        Damage = 30,
+        Health = 60,
         RewardCoins = 30,
     },
     {
@@ -75,6 +87,8 @@ return {
         ModelName = "CrystalRook",
         Icon = "rbxassetid://0",
         DisplayOdds = "1 in 20",
+        Damage = 28,
+        Health = 56,
         RewardCoins = 28,
     },
     {
@@ -86,6 +100,8 @@ return {
         ModelName = "PrismPhoenix",
         Icon = "rbxassetid://0",
         DisplayOdds = "1 in 60",
+        Damage = 60,
+        Health = 120,
         RewardCoins = 60,
     },
     {
@@ -97,6 +113,8 @@ return {
         ModelName = "AuroraManta",
         Icon = "rbxassetid://0",
         DisplayOdds = "1 in 45",
+        Damage = 55,
+        Health = 110,
         RewardCoins = 55,
     },
     {
@@ -108,6 +126,8 @@ return {
         ModelName = "SpectrumHydra",
         Icon = "rbxassetid://0",
         DisplayOdds = "1 in 90",
+        Damage = 90,
+        Health = 180,
         RewardCoins = 90,
     },
     {
@@ -119,6 +139,8 @@ return {
         ModelName = "MoltenGolem",
         Icon = "rbxassetid://0",
         DisplayOdds = "1 in 75",
+        Damage = 120,
+        Health = 240,
         RewardCoins = 120,
     },
     {
@@ -130,6 +152,8 @@ return {
         ModelName = "InfernoSeraph",
         Icon = "rbxassetid://0",
         DisplayOdds = "1 in 250",
+        Damage = 250,
+        Health = 500,
         RewardCoins = 250,
     },
 }

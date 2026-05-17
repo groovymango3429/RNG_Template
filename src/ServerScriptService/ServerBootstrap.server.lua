@@ -19,6 +19,7 @@ local RNGService = require(Services:WaitForChild("RNGService"))
 local RebirthService = require(Services:WaitForChild("RebirthService"))
 local RemoteService = require(Services:WaitForChild("RemoteService"))
 local RewardService = require(Services:WaitForChild("RewardService"))
+local MAX_EQUIPPED_ITEMS = 3
 
 local rollLookup = {}
 for _, item in ipairs(RollConfig) do
@@ -36,10 +37,10 @@ local function compareItemsForEquip(leftItem, rightItem)
         return leftOrder > rightOrder
     end
 
-    local leftCoins = leftItem and leftItem.RewardCoins or 0
-    local rightCoins = rightItem and rightItem.RewardCoins or 0
-    if leftCoins ~= rightCoins then
-        return leftCoins > rightCoins
+    local leftStrength = leftItem and (leftItem.Damage or leftItem.RewardCoins) or 0
+    local rightStrength = rightItem and (rightItem.Damage or rightItem.RewardCoins) or 0
+    if leftStrength ~= rightStrength then
+        return leftStrength > rightStrength
     end
 
     local leftName = tostring(leftItem and (leftItem.DisplayName or leftItem.Id) or "")
@@ -47,24 +48,76 @@ local function compareItemsForEquip(leftItem, rightItem)
     return leftName < rightName
 end
 
-local function resolveBestOwnedItemId(profile)
-    local bestId = nil
-    local bestItem = nil
+local function resolveBestOwnedItemIds(profile, limit)
+    local available = {}
     local inventory = profile and profile.Inventory
     if type(inventory) ~= "table" then
-        return nil
+        return {}
     end
 
     for itemId, amount in pairs(inventory) do
         if type(itemId) == "string" and type(amount) == "number" and amount > 0 then
             local candidate = rollLookup[itemId]
-            if candidate and (not bestItem or compareItemsForEquip(candidate, bestItem)) then
-                bestItem = candidate
-                bestId = itemId
+            if candidate then
+                table.insert(available, {
+                    Id = itemId,
+                    Item = candidate,
+                })
             end
         end
     end
-    return bestId
+
+    table.sort(available, function(left, right)
+        if compareItemsForEquip(left.Item, right.Item) then
+            return true
+        end
+        if compareItemsForEquip(right.Item, left.Item) then
+            return false
+        end
+        return left.Id < right.Id
+    end)
+
+    local itemLimit = math.max(0, math.floor(limit or MAX_EQUIPPED_ITEMS))
+    local result = {}
+    for index = 1, math.min(#available, itemLimit) do
+        table.insert(result, available[index].Id)
+    end
+    return result
+end
+
+local function normalizeEquippedItemIds(profile)
+    local inventory = profile and profile.Inventory
+    local equippedIds = {}
+    local seen = {}
+
+    local function canUse(itemId)
+        return type(itemId) == "string"
+            and itemId ~= ""
+            and type(inventory) == "table"
+            and type(inventory[itemId]) == "number"
+            and inventory[itemId] > 0
+            and rollLookup[itemId] ~= nil
+    end
+
+    if type(profile and profile.EquippedItemIds) == "table" then
+        for _, itemId in ipairs(profile.EquippedItemIds) do
+            if canUse(itemId) and not seen[itemId] then
+                table.insert(equippedIds, itemId)
+                seen[itemId] = true
+                if #equippedIds >= MAX_EQUIPPED_ITEMS then
+                    break
+                end
+            end
+        end
+    end
+
+    if #equippedIds == 0 and canUse(profile and profile.EquippedItemId) then
+        table.insert(equippedIds, profile.EquippedItemId)
+    end
+
+    profile.EquippedItemIds = equippedIds
+    profile.EquippedItemId = equippedIds[1]
+    return equippedIds
 end
 
 RemoteService:Init()
@@ -101,6 +154,7 @@ local function buildSnapshot(player)
         },
         Inventory = profile.Inventory,
         EquippedItemId = profile.EquippedItemId,
+        EquippedItemIds = normalizeEquippedItemIds(profile),
         Index = profile.Index,
         Rewards = {
             Daily = RewardService:GetDailyState(player),
@@ -127,6 +181,7 @@ local function onPlayerAdded(player)
     local profile, isFallback = DataService:LoadProfile(player)
     if profile then
         profile.Settings.AutoRoll = false
+        normalizeEquippedItemIds(profile)
         if profile.Meta.SaveMode ~= "Fallback" then
             DataService:MarkDirty(player)
         end
@@ -239,12 +294,27 @@ RemoteService:Get("RequestEquipItem").OnServerInvoke = function(player, itemId)
     end
 
     local didEquip = false
+    local updatedEquipped = nil
     local profile = DataService:UpdateProfile(player, function(activeProfile)
         local owned = (activeProfile.Inventory and activeProfile.Inventory[itemId]) or 0
         if owned <= 0 then
             return
         end
-        activeProfile.EquippedItemId = itemId
+        local equippedIds = normalizeEquippedItemIds(activeProfile)
+        for _, equippedId in ipairs(equippedIds) do
+            if equippedId == itemId then
+                didEquip = true
+                updatedEquipped = equippedIds
+                return
+            end
+        end
+        if #equippedIds >= MAX_EQUIPPED_ITEMS then
+            return
+        end
+        table.insert(equippedIds, itemId)
+        activeProfile.EquippedItemIds = equippedIds
+        activeProfile.EquippedItemId = equippedIds[1]
+        updatedEquipped = equippedIds
         didEquip = true
     end)
 
@@ -253,20 +323,29 @@ RemoteService:Get("RequestEquipItem").OnServerInvoke = function(player, itemId)
     end
 
     if not didEquip then
+        local equippedCount = profile and profile.EquippedItemIds and #profile.EquippedItemIds or 0
+        if equippedCount >= MAX_EQUIPPED_ITEMS then
+            return { Success = false, Message = string.format("You can only equip %d pets.", MAX_EQUIPPED_ITEMS) }
+        end
         return { Success = false, Message = "You do not own this item." }
     end
 
     pushState(player)
-    return { Success = true, EquippedItemId = profile.EquippedItemId }
+    return {
+        Success = true,
+        EquippedItemId = profile.EquippedItemId,
+        EquippedItemIds = updatedEquipped or normalizeEquippedItemIds(profile),
+    }
 end
 
 RemoteService:Get("RequestEquipBestItem").OnServerInvoke = function(player)
-    local equippedBestId = nil
+    local equippedBestIds = nil
     local profile = DataService:UpdateProfile(player, function(activeProfile)
-        local bestId = resolveBestOwnedItemId(activeProfile)
-        if bestId then
-            activeProfile.EquippedItemId = bestId
-            equippedBestId = bestId
+        local bestIds = resolveBestOwnedItemIds(activeProfile, MAX_EQUIPPED_ITEMS)
+        if #bestIds > 0 then
+            activeProfile.EquippedItemIds = bestIds
+            activeProfile.EquippedItemId = bestIds[1]
+            equippedBestIds = bestIds
         end
     end)
 
@@ -274,12 +353,16 @@ RemoteService:Get("RequestEquipBestItem").OnServerInvoke = function(player)
         return { Success = false, Message = "Profile not loaded." }
     end
 
-    if type(equippedBestId) ~= "string" or equippedBestId == "" then
+    if type(equippedBestIds) ~= "table" or #equippedBestIds == 0 then
         return { Success = false, Message = "No item available to equip." }
     end
 
     pushState(player)
-    return { Success = true, EquippedItemId = equippedBestId }
+    return {
+        Success = true,
+        EquippedItemId = equippedBestIds[1],
+        EquippedItemIds = equippedBestIds,
+    }
 end
 
 RemoteService:Get("PromptGamepassPurchase").OnServerInvoke = function(player, key)

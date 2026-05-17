@@ -138,7 +138,7 @@ Top-level objects expected under `YourUiPack!`:
 - `InvUI.HolderFrame.Inv.Header.CloseBtn` - closes inventory.
 - `InvUI.HolderFrame.Inv.Content.Slots1` - receives runtime inventory slots cloned from `Slots1.Slot1` (template child button).
 - `InvUI.HolderFrame.Frame.ReadyButton` - equips the currently selected inventory item.
-- `InvUI.HolderFrame.Inv.EquipBest.EquipBest` - equips the best owned inventory item.
+- `InvUI.HolderFrame.Inv.EquipBest.EquipBest` - equips the best 3 owned inventory pets.
 
 If any of these objects are missing, the scripts warn clearly and skip that behavior instead of creating replacements.
 
