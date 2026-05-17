@@ -61,6 +61,21 @@ local function migrateProfile(profile)
         profile.Inventory = normalizeInventory(profile.Inventory)
     end
 
+    if type(profile.Stats) ~= "table" then
+        profile.Stats = {}
+    end
+
+    local stats = profile.Stats
+    local coins = tonumber(stats.Coins) or tonumber(stats.Cash) or 0
+    local shards = tonumber(stats.Shards) or tonumber(stats.Gems) or 0
+
+    stats.Coins = math.max(0, math.floor(coins))
+    stats.Cash = stats.Coins
+    stats.Shards = math.max(0, math.floor(shards))
+    stats.Gems = stats.Shards
+    stats.Rolls = math.max(0, math.floor(tonumber(stats.Rolls) or 0))
+    stats.Rebirths = math.max(0, math.floor(tonumber(stats.Rebirths) or 0))
+
     profile.Meta.SchemaVersion = CURRENT_SCHEMA_VERSION
     return profile
 end
@@ -81,7 +96,9 @@ local function buildDefaultProfile(userId: number)
         },
         Stats = {
             Coins = 0,
+            Cash = 0,
             Gems = 0,
+            Shards = 0,
             Rolls = 0,
             Rebirths = 0,
         },

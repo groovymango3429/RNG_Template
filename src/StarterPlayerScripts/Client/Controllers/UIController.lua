@@ -82,6 +82,27 @@ local function findFirstDescendantByName(root, name, className)
     return nil
 end
 
+local function findFirstDescendantByNameInsensitive(root, names, className)
+    if not root then
+        return nil
+    end
+
+    local lookup = {}
+    for _, candidate in ipairs(names) do
+        if type(candidate) == "string" and candidate ~= "" then
+            lookup[string.lower(candidate)] = true
+        end
+    end
+
+    for _, descendant in ipairs(root:GetDescendants()) do
+        if (className == nil or descendant:IsA(className)) and lookup[string.lower(descendant.Name)] then
+            return descendant
+        end
+    end
+
+    return nil
+end
+
 local function findFirstSlotTemplate(container)
     if not container then
         return nil
@@ -244,6 +265,7 @@ function UIController.new(remotes, notifier)
     self._inventoryTemplate = nil
     self._inventorySelectedItemId = nil
     self._inventoryRefs = nil
+    self._currencyRefs = nil
 
     if self._ui then
         for _, panelName in ipairs(UIConfig.Panels) do
@@ -256,6 +278,7 @@ function UIController.new(remotes, notifier)
         self:_bindRewardButtons()
         self:_captureRewardsPanelLayout()
         self:_setupInventoryUI()
+        self:_setupCurrencyUI()
     end
 
     self:_setupRollingUI()
@@ -609,6 +632,46 @@ function UIController:_setupInventoryUI()
     end
 end
 
+function UIController:_setupCurrencyUI()
+    local roots = { self._ui, self._playerGui }
+    local cashContainer = nil
+    local shardContainer = nil
+
+    for _, root in ipairs(roots) do
+        if not cashContainer then
+            cashContainer = findFirstDescendantByNameInsensitive(root, { "CashGui", "CashUI", "Cash" }, "GuiObject")
+        end
+        if not shardContainer then
+            shardContainer = findFirstDescendantByNameInsensitive(root, { "ShardGui", "ShardsGui", "ShardUI", "Shard", "Shards" }, "GuiObject")
+        end
+    end
+
+    local function resolveValueLabel(container)
+        if not container then
+            return nil
+        end
+
+        local label = findLabel(container, {
+            { "Label01", "Main" },
+            { "Label02", "Main" },
+            { "Amount" },
+            { "Value" },
+            { "Text" },
+            { "Main" },
+        })
+        if label then
+            return label
+        end
+
+        return findFirstDescendantByNameInsensitive(container, { "Main", "Amount", "Value", "Text", "Label01", "Label02" }, "TextLabel")
+    end
+
+    self._currencyRefs = {
+        CashLabel = resolveValueLabel(cashContainer),
+        ShardLabel = resolveValueLabel(shardContainer),
+    }
+end
+
 function UIController:_updateInventoryDetail(entry, equippedItemLookup)
     local refs = self._inventoryRefs
     if not refs then
@@ -848,7 +911,7 @@ function UIController:_updateInventory(snapshot)
             end
 
             local equippedStroke = self:_ensureInventorySlotStroke(slot)
-            equippedStroke.Transparency = entry.Id == selectedId and 0 or 1
+            equippedStroke.Transparency = 1
 
             if slot:IsA("GuiButton") then
                 self._trove:Connect(slot.Activated, function()
@@ -1568,9 +1631,12 @@ function UIController:_updateRebirth(snapshot)
     })
     local fill = SafeWait.FindPath(rebirthPanel, { "Content", "Progress", "Bar", "Fill" })
 
+    local currentShards = rebirthState.CurrentShards or rebirthState.CurrentRolls or 0
+    local requiredShards = rebirthState.NextRequiredShards or rebirthState.NextRequiredRolls or 0
+    local nextBonusShards = rebirthState.NextBonusShards or rebirthState.NextBonusGems or 0
     setText(currentLabel, string.format("Rebirths: %s", FormatUtil.Number(rebirthState.CurrentRebirths or 0)))
-    setText(nextLabel, string.format("Next Bonus: %s Gems", FormatUtil.Number(rebirthState.NextBonusGems or 0)))
-    setText(progressLabel, string.format("%s / %s rolls", FormatUtil.Number(rebirthState.CurrentRolls or 0), FormatUtil.Number(rebirthState.NextRequiredRolls or 0)))
+    setText(nextLabel, string.format("Next Bonus: %s Shards", FormatUtil.Number(nextBonusShards)))
+    setText(progressLabel, string.format("%s / %s shards", FormatUtil.Number(currentShards), FormatUtil.Number(requiredShards)))
     setFill(fill, rebirthState.Progress or 0)
 end
 
@@ -1592,11 +1658,31 @@ function UIController:_updateRewardPanel(snapshot)
         { "Content", "WatchBtn", "Label01", "Main" },
     })
 
-    setText(titleLabel, string.format("Coins: %s", FormatUtil.Number(snapshot.Stats.Coins or 0)))
-    setText(subLabel, string.format("Gems: %s", FormatUtil.Number(snapshot.Stats.Gems or 0)))
+    local cash = snapshot.Stats.Cash or snapshot.Stats.Coins or 0
+    local shards = snapshot.Stats.Shards or snapshot.Stats.Gems or 0
+    setText(titleLabel, string.format("Cash: %s", FormatUtil.Number(cash)))
+    setText(subLabel, string.format("Shards: %s", FormatUtil.Number(shards)))
     local featuredProduct = DeveloperProducts[UIConfig.FeaturedProductKey]
     if featuredProduct then
         setText(watchButtonLabel, featuredProduct.Label)
+    end
+end
+
+function UIController:_updateCurrencyUI(snapshot)
+    local refs = self._currencyRefs
+    if not refs then
+        return
+    end
+
+    local cash = snapshot.Stats.Cash or snapshot.Stats.Coins or 0
+    local shards = snapshot.Stats.Shards or snapshot.Stats.Gems or 0
+
+    if refs.CashLabel and refs.CashLabel:IsA("TextLabel") then
+        refs.CashLabel.Text = FormatUtil.Number(cash)
+    end
+
+    if refs.ShardLabel and refs.ShardLabel:IsA("TextLabel") then
+        refs.ShardLabel.Text = FormatUtil.Number(shards)
     end
 end
 
@@ -1709,6 +1795,7 @@ function UIController:ApplySnapshot(snapshot)
     self:_updateInventory(snapshot)
     self:_updateRebirth(snapshot)
     self:_updateRewardPanel(snapshot)
+    self:_updateCurrencyUI(snapshot)
     self:_updateAutoRollState(snapshot)
 end
 

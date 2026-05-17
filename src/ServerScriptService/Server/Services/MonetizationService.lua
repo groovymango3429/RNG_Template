@@ -43,7 +43,8 @@ function MonetizationService:Init(dataService)
                 self._dataService:UpdateProfile(player, function(profile)
                     profile.Purchases.Gamepasses[key] = true
                     if key == "VIP" then
-                        profile.Stats.Gems = (profile.Stats.Gems or 0) + (definition.ExtraGems or 0)
+                        profile.Stats.Shards = (profile.Stats.Shards or profile.Stats.Gems or 0) + (definition.ExtraGems or 0)
+                        profile.Stats.Gems = profile.Stats.Shards
                     end
                 end)
                 self._pushState(player)
