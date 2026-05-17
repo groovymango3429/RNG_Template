@@ -8,6 +8,8 @@ return {
         { Name = "ClaimDailyReward", ClassName = "RemoteFunction" },
         { Name = "ClaimPlaytimeReward", ClassName = "RemoteFunction" },
         { Name = "RequestRebirth", ClassName = "RemoteFunction" },
+        { Name = "RequestEquipItem", ClassName = "RemoteFunction" },
+        { Name = "RequestEquipBestItem", ClassName = "RemoteFunction" },
         { Name = "PromptGamepassPurchase", ClassName = "RemoteFunction" },
         { Name = "PromptDeveloperProductPurchase", ClassName = "RemoteFunction" },
         { Name = "StateUpdated", ClassName = "RemoteEvent" },

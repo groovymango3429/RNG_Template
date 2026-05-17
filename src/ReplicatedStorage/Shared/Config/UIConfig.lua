@@ -8,6 +8,7 @@ return {
         "PlaytimeRewards",
         "Rewards",
         "Shop",
+        "InvUI",
         "Discover",
         "Index",
         "Rebirth",
@@ -17,6 +18,7 @@ return {
     NavigationButtons = {
         DailyRewards = { "LeftSide", "ReadyBtn" },
         Shop = { "LeftSide", "ShopBtn" },
+        InvUI = { "LeftSide", "BackpackBtn" },
         Index = { "LeftSide", "IndexBtn" },
         Rebirth = { "LeftSide", "RebirthBtn" },
         Discover = { "LeftBottomBar", "IconBtn03" },
@@ -25,6 +27,7 @@ return {
     ExternalPanels = {
         -- Path entries are an array of child names traversed sequentially from PlayerGui via SafeWait.FindPath.
         Shop = { "Shop", "ItemShopUI" },
+        InvUI = { "InvUI" },
     },
     ActionButtons = {
         Roll = { "LeftBottomBar", "IconBtn01" },
@@ -38,6 +41,7 @@ return {
         DailyRewards = { "DailyRewards", "Header", "CloseBtn" },
         PlaytimeRewards = { "PlaytimeRewards", "Header", "CloseBtn" },
         Rewards = { "Rewards", "Header", "CloseBtn" },
+        InvUI = { "HolderFrame", "Inv", "Header", "CloseBtn" },
         Index = { "Index", "Main", "Header", "CloseBtn" },
         Rebirth = { "Rebirth", "Header", "CloseBtn" },
     },

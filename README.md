@@ -91,6 +91,7 @@ Top-level objects expected under `YourUiPack!`:
 - `Rebirth` - rebirth progress and purchase shortcuts.
 - `LeftSide` - main navigation buttons.
 - `LeftBottomBar` - rolling and quick action buttons.
+- `InvUI` - inventory/equip panel (resolved from `PlayerGui.InvUI`).
 
 ### Exact paths used by the client scripts
 #### Required root panel access
@@ -108,6 +109,7 @@ Top-level objects expected under `YourUiPack!`:
 #### Navigation buttons expected
 - `YourUiPack!.LeftSide.ReadyBtn` - opens `DailyRewards`.
 - `YourUiPack!.LeftSide.ShopBtn` - opens `ItemShopUI` inside `PlayerGui.Shop`.
+- `YourUiPack!.LeftSide.BackpackBtn` - opens `PlayerGui.InvUI`.
 - `YourUiPack!.LeftSide.IndexBtn` - opens `Index`.
 - `YourUiPack!.LeftSide.RebirthBtn` - opens `Rebirth`.
 - `YourUiPack!.LeftBottomBar.IconBtn01` - performs a roll.
@@ -133,6 +135,10 @@ Top-level objects expected under `YourUiPack!`:
 - `Rebirth.Header.CloseBtn` - closes the rebirth panel.
 - `Rebirth.Content.Btns.RebirthBtn` - attempts a rebirth.
 - `Rebirth.Content.Btns.SkipRebirthBtn` - prompts the configured skip rebirth developer product.
+- `InvUI.HolderFrame.Inv.Header.CloseBtn` - closes inventory.
+- `InvUI.HolderFrame.Inv.Content.Slots1` - receives runtime inventory slots cloned from `Slot1`.
+- `InvUI.HolderFrame.Frame.ReadyButton` - equips the currently selected inventory item.
+- `InvUI.HolderFrame.Inv.EquipBest.EquipBest` - equips the best owned inventory item.
 
 If any of these objects are missing, the scripts warn clearly and skip that behavior instead of creating replacements.
 
