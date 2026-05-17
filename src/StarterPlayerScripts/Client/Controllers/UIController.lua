@@ -509,20 +509,23 @@ function UIController:_setupInventoryUI()
     end
 end
 
-function UIController:_updateInventoryDetail(entry, equippedItemId)
+function UIController:_updateInventoryDetail(entry, equippedItemLookup)
     local refs = self._inventoryRefs
     if not refs then
         return
     end
 
     local item = entry and entry.Item
-    local isEquipped = entry and entry.Id == equippedItemId
+    local isEquipped = entry and equippedItemLookup and equippedItemLookup[entry.Id] == true
 
     setImage(refs.DetailItem, item and item.Icon or "")
     setText(refs.DetailName, item and getItemDisplayName(item) or "No Item")
     setText(refs.DetailRarity, item and tostring(item.Rarity or "") or "")
-    setText(refs.DetailDamage, FormatUtil.Number(item and (item.Damage or item.RewardCoins or 0) or 0))
-    setText(refs.DetailHealth, FormatUtil.Number(item and (item.Health or item.RewardHealth or 0) or 0))
+    setText(refs.DetailDamage, string.format("+%s", FormatUtil.Number(item and (item.Damage or item.RewardCoins or 0) or 0)))
+    setText(refs.DetailHealth, string.format("+%s", FormatUtil.Number(item and (item.Health or item.RewardHealth or 0) or 0)))
+    if refs.DetailRarity and refs.DetailRarity:IsA("TextLabel") then
+        refs.DetailRarity.TextColor3 = getRarityColor(item and item.Rarity or nil)
+    end
 
     if refs.ReadyLabel and refs.ReadyLabel:IsA("TextLabel") then
         if not entry then
@@ -544,15 +547,23 @@ function UIController:_updateInventory(snapshot)
         return
     end
 
-    local equippedItemId = snapshot.EquippedItemId
+    local equippedItemIds = snapshot.EquippedItemIds
+    if type(equippedItemIds) ~= "table" then
+        equippedItemIds = {}
+        if type(snapshot.EquippedItemId) == "string" and snapshot.EquippedItemId ~= "" then
+            table.insert(equippedItemIds, snapshot.EquippedItemId)
+        end
+    end
+    local equippedItemLookup = {}
+    for _, equippedId in ipairs(equippedItemIds) do
+        equippedItemLookup[equippedId] = true
+    end
     local inventoryState = snapshot.Inventory or {}
     local entries = {}
-    local totalCount = 0
     for itemId, amount in pairs(inventoryState) do
         if type(itemId) == "string" and type(amount) == "number" and amount > 0 then
             local resolvedItem = self:_resolveRollItem({ Id = itemId })
             if resolvedItem then
-                totalCount += amount
                 table.insert(entries, {
                     Id = itemId,
                     Count = amount,
@@ -613,17 +624,16 @@ function UIController:_updateInventory(snapshot)
         setText(rarityLabel, tostring(entry.Item.Rarity or ""))
         setImage(itemImage, tostring(entry.Item.Icon or ""))
 
-        local rarityStroke = rarityLabel and rarityLabel:FindFirstChildOfClass("UIStroke")
-        if rarityStroke then
-            rarityStroke.Color = getRarityColor(entry.Item.Rarity)
+        if rarityLabel and rarityLabel:IsA("TextLabel") then
+            rarityLabel.TextColor3 = getRarityColor(entry.Item.Rarity)
         end
 
         local equippedStroke = self:_ensureInventorySlotStroke(slot)
-        equippedStroke.Transparency = (entry.Id == equippedItemId) and 0 or 1
+        equippedStroke.Transparency = equippedItemLookup[entry.Id] and 0 or 1
 
         self._trove:Connect(slot.Activated, function()
             self._inventorySelectedItemId = entry.Id
-            self:_updateInventoryDetail(entry, equippedItemId)
+            self:_updateInventoryDetail(entry, equippedItemLookup)
         end)
 
         if entry.Id == selectedId then
@@ -632,10 +642,10 @@ function UIController:_updateInventory(snapshot)
     end
 
     self._inventorySelectedItemId = selectedEntry and selectedEntry.Id or nil
-    self:_updateInventoryDetail(selectedEntry, equippedItemId)
+    self:_updateInventoryDetail(selectedEntry, equippedItemLookup)
 
     if refs.YouLabel and refs.YouLabel:IsA("TextLabel") then
-        refs.YouLabel.Text = string.format("You (%s)", FormatUtil.Number(totalCount))
+        refs.YouLabel.Text = "Backpack"
     end
 end
 

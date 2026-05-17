@@ -34,6 +34,7 @@ local function buildDefaultProfile(userId: number)
         },
         Inventory = {} :: {[string]: number},
         EquippedItemId = nil :: string?,
+        EquippedItemIds = {} :: {string},
         Index = {} :: {[string]: boolean},
         Rewards = {
             Daily = {
