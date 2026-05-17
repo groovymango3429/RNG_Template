@@ -1,5 +1,10 @@
 --!strict
 local FormatUtil = {}
+local SCALE_FACTOR_BY_DECIMALS = {
+    [0] = 1,
+    [1] = 10,
+    [2] = 100,
+}
 
 function FormatUtil.Number(value)
     local numeric = tonumber(value) or 0
@@ -23,7 +28,7 @@ function FormatUtil.Number(value)
         if absolute >= threshold then
             local scaled = absolute / threshold
             local decimals = (if scaled >= 100 then 0 elseif scaled >= 10 then 1 else 2)
-            local scaleFactor = 10 ^ decimals
+            local scaleFactor = SCALE_FACTOR_BY_DECIMALS[decimals] or 1
             scaled = math.floor(scaled * scaleFactor) / scaleFactor
             local formatString = "%." .. tostring(decimals) .. "f"
             local compact = string.format(formatString, scaled):gsub("%.?0+$", "")
