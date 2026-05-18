@@ -43,10 +43,11 @@ function RNGService:GetLuckMultiplier(player)
 
     local boost = profile.Boosts.Luck or { Amount = 0, ExpiresAt = 0 }
     local activeBoost = (boost.ExpiresAt or 0) > os.time() and (boost.Amount or 0) or 0
-    local rebirthBonus = (profile.Stats.Rebirths or 0) * ProgressionConfig.RebirthLuckPerLevel
+    local rebirths = math.max(0, math.floor(profile.Stats.Rebirths or 0))
+    local rebirthMultiplier = (ProgressionConfig.RebirthLuckPerLevel or 1) ^ rebirths
     local monetizationBonus = self._monetizationService:GetLuckModifier(player)
 
-    return ProgressionConfig.BaseLuckMultiplier + rebirthBonus + monetizationBonus + activeBoost
+    return (ProgressionConfig.BaseLuckMultiplier * rebirthMultiplier) + monetizationBonus + activeBoost
 end
 
 function RNGService:GetDiscoverState(player)

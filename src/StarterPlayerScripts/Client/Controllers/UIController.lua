@@ -39,10 +39,18 @@ local INDEX_ZONE_BY_BUTTON = {
 local INVENTORY_SELECTION_COLOR = Color3.fromRGB(110, 224, 122)
 local READY_BUTTON_EQUIP_COLOR = Color3.fromRGB(110, 224, 122)
 local READY_BUTTON_UNEQUIP_COLOR = Color3.fromRGB(232, 90, 90)
+local LIGHT_RED_TEXT_COLOR = Color3.fromRGB(255, 170, 170)
+local LIGHT_GREEN_TEXT_COLOR = Color3.fromRGB(170, 255, 170)
 
 local function setText(instance, text)
     if instance and instance:IsA("TextLabel") then
         instance.Text = text
+    end
+end
+
+local function setTextColor(instance, color)
+    if instance and instance:IsA("TextLabel") then
+        instance.TextColor3 = color
     end
 end
 
@@ -219,6 +227,11 @@ local function formatSignedStat(value)
         return string.format("+%s", FormatUtil.Number(amount))
     end
     return FormatUtil.Number(amount)
+end
+
+local function formatLuckMultiplier(value)
+    local numeric = tonumber(value) or 0
+    return string.format("%.2fx", numeric)
 end
 
 
@@ -635,41 +648,40 @@ end
 
 function UIController:_setupCurrencyUI()
     local roots = { self._ui, self._playerGui }
-    local cashContainer = nil
-    local shardContainer = nil
 
-    for _, root in ipairs(roots) do
-        if not cashContainer then
-            cashContainer = findFirstDescendantByNamesInsensitive(root, { "CashGui", "CashUI", "Cash" }, "GuiObject")
+    local function findPreferredLabel(paths, fallbackNames)
+        for _, root in ipairs(roots) do
+            for _, path in ipairs(paths) do
+                local label = root and SafeWait.FindPath(root, path, true)
+                if label and label:IsA("TextLabel") then
+                    return label
+                end
+            end
         end
-        if not shardContainer then
-            shardContainer = findFirstDescendantByNamesInsensitive(root, { "ShardGui", "ShardsGui", "ShardUI", "Shard", "Shards" }, "GuiObject")
+        for _, root in ipairs(roots) do
+            local label = findFirstDescendantByNamesInsensitive(root, fallbackNames, "TextLabel")
+            if label then
+                return label
+            end
         end
-    end
-
-    local function resolveValueLabel(container)
-        if not container then
-            return nil
-        end
-
-        local label = findLabel(container, {
-            { "Label01", "Main" },
-            { "Label02", "Main" },
-            { "Amount" },
-            { "Value" },
-            { "Text" },
-            { "Main" },
-        })
-        if label then
-            return label
-        end
-
-        return findFirstDescendantByNamesInsensitive(container, { "Main", "Amount", "Value", "Text", "Label01", "Label02" }, "TextLabel")
+        return nil
     end
 
     self._currencyRefs = {
-        CashLabel = resolveValueLabel(cashContainer),
-        ShardLabel = resolveValueLabel(shardContainer),
+        CashLabel = findPreferredLabel({
+            { "Currency", "Cash", "CashAmount" },
+            { "Cash", "CashAmount" },
+            { "CashGui", "Label01", "Main" },
+            { "CashUI", "Label01", "Main" },
+        }, { "CashAmount", "CashValue", "CashText" }),
+        ShardLabel = findPreferredLabel({
+            { "Currency", "Shard", "ShardAmount" },
+            { "Shards", "ShardAmount" },
+            { "Shard", "ShardAmount" },
+            { "ShardGui", "Label01", "Main" },
+            { "ShardsGui", "Label01", "Main" },
+            { "ShardUI", "Label01", "Main" },
+        }, { "ShardAmount", "ShardsAmount", "ShardValue", "ShardsValue" }),
     }
 end
 
@@ -1631,14 +1643,54 @@ function UIController:_updateRebirth(snapshot)
         { "Content", "Label01", "Main" },
     })
     local fill = SafeWait.FindPath(rebirthPanel, { "Content", "Progress", "Bar", "Fill" })
+    local progressLabelModern = SafeWait.FindPath(rebirthPanel, { "BarFrame", "ShardsNeeded" }, true)
+    local fillModern = SafeWait.FindPath(rebirthPanel, { "BarFrame", "Frame" }, true)
+    local rebirthCountLabelModern = SafeWait.FindPath(rebirthPanel, { "Youhave_Rebirths" }, true)
 
-    local currentShards = rebirthState.CurrentShards or 0
+    local currentCashLabelModern = SafeWait.FindPath(rebirthPanel, { "CurrentCash", "CashAmount" }, true)
+    local afterCashLabelModern = SafeWait.FindPath(rebirthPanel, { "AfterCash", "CashAmount" }, true)
+    local currentLevelLabelModern = SafeWait.FindPath(rebirthPanel, { "CurrentZone", "ZoneAmount" }, true)
+    local afterLevelLabelModern = SafeWait.FindPath(rebirthPanel, { "AfterZone", "ZoneAmount" }, true)
+    local currentShardLabelModern = SafeWait.FindPath(rebirthPanel, { "CurrentShard", "ShardAmount" }, true)
+    local afterShardLabelModern = SafeWait.FindPath(rebirthPanel, { "AfterShard", "ShardAmount" }, true)
+    local currentLuckLabelModern = SafeWait.FindPath(rebirthPanel, { "CurrentLuck", "LuckAmount" }, true)
+    local afterLuckLabelModern = SafeWait.FindPath(rebirthPanel, { "AfterLuck", "LuckAmount" }, true)
+
+    local cash = snapshot.Stats.Cash or snapshot.Stats.Coins or 0
+    local level = snapshot.Stats.Rolls or 0
+    local currentShards = snapshot.Stats.Shards or snapshot.Stats.Gems or rebirthState.CurrentShards or 0
     local requiredShards = rebirthState.NextRequiredShards or 0
     local nextBonusShards = rebirthState.NextBonusShards or 0
+    local rebirthCount = snapshot.Stats.Rebirths or rebirthState.CurrentRebirths or 0
+    local luckNow = snapshot.Stats.LuckMultiplier or 1
+    local luckMultiplierPerRebirth = ProgressionConfig.RebirthLuckPerLevel or 1
+    local luckAfter = luckNow * luckMultiplierPerRebirth
+    local shardsAfter = currentShards - requiredShards
+
+    local progress = requiredShards > 0 and math.clamp(currentShards / requiredShards, 0, 1) or 1
+
     setText(currentLabel, string.format("Rebirths: %s", FormatUtil.Number(rebirthState.CurrentRebirths or 0)))
     setText(nextLabel, string.format("Next Bonus: %s Shards", FormatUtil.Number(nextBonusShards)))
     setText(progressLabel, string.format("%s / %s shards", FormatUtil.Number(currentShards), FormatUtil.Number(requiredShards)))
-    setFill(fill, rebirthState.Progress or 0)
+    setFill(fill, progress)
+
+    setText(progressLabelModern, string.format("%s/%s", FormatUtil.Number(currentShards), FormatUtil.Number(requiredShards)))
+    setFill(fillModern, progress)
+    setText(rebirthCountLabelModern, string.format("You have %s Rebirths", FormatUtil.Number(rebirthCount)))
+
+    setText(currentCashLabelModern, FormatUtil.Number(cash))
+    setText(afterCashLabelModern, "0")
+    setText(currentLevelLabelModern, FormatUtil.Number(level))
+    setText(afterLevelLabelModern, "0")
+    setText(currentShardLabelModern, FormatUtil.Number(currentShards))
+    setText(afterShardLabelModern, FormatUtil.Number(shardsAfter))
+    setText(currentLuckLabelModern, formatLuckMultiplier(luckNow))
+    setText(afterLuckLabelModern, formatLuckMultiplier(luckAfter))
+
+    setTextColor(afterCashLabelModern, LIGHT_RED_TEXT_COLOR)
+    setTextColor(afterLevelLabelModern, LIGHT_RED_TEXT_COLOR)
+    setTextColor(afterShardLabelModern, shardsAfter < 0 and LIGHT_RED_TEXT_COLOR or LIGHT_GREEN_TEXT_COLOR)
+    setTextColor(afterLuckLabelModern, LIGHT_GREEN_TEXT_COLOR)
 end
 
 function UIController:_updateRewardPanel(snapshot)

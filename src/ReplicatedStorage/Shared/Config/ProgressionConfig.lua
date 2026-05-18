@@ -1,7 +1,7 @@
 --!strict
 return {
     BaseLuckMultiplier = 1,
-    RebirthLuckPerLevel = 0.12,
+    RebirthLuckPerLevel = 1.89,
     DiscoverZones = {
         { Id = "Normal", RequiredRolls = 0, RequiredRebirths = 0 },
         { Id = "Candy", RequiredRolls = 15, RequiredRebirths = 0 },
