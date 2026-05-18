@@ -1663,8 +1663,8 @@ function UIController:_updateRebirth(snapshot)
     local nextBonusShards = rebirthState.NextBonusShards or 0
     local rebirthCount = snapshot.Stats.Rebirths or rebirthState.CurrentRebirths or 0
     local luckNow = snapshot.Stats.LuckMultiplier or 1
-    local luckGrowth = ProgressionConfig.RebirthLuckPerLevel or 1
-    local luckAfter = luckNow * luckGrowth
+    local luckMultiplierPerRebirth = ProgressionConfig.RebirthLuckPerLevel or 1
+    local luckAfter = luckNow * luckMultiplierPerRebirth
     local shardsAfter = currentShards - requiredShards
 
     local progress = requiredShards > 0 and math.clamp(currentShards / requiredShards, 0, 1) or 1
