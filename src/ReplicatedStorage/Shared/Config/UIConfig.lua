@@ -34,7 +34,7 @@ return {
         AutoRoll = { "LeftBottomBar", "IconBtn02" },
         LuckProduct = { "LeftBottomBar", "IconBtn04" },
         RewardsWatch = { "Rewards", "Content", "WatchBtn" },
-        Rebirth = { "Rebirth", "Content", "Btns", "RebirthBtn" },
+        Rebirth = { "Rebirth", "RebirthButton" },
         SkipRebirth = { "Rebirth", "Content", "Btns", "SkipRebirthBtn" },
     },
     CloseButtons = {
@@ -43,7 +43,7 @@ return {
         Rewards = { "Rewards", "Header", "CloseBtn" },
         InvUI = { "HolderFrame", "Inv", "Header", "CloseBtn" },
         Index = { "Index", "Main", "Header", "CloseBtn" },
-        Rebirth = { "Rebirth", "Header", "CloseBtn" },
+        Rebirth = { "Rebirth", "CloseBtn" },
     },
     DiscoverOrder = { "Normal", "Candy", "Gold", "Diamond", "Rainbow", "Vulcan" },
     FeaturedProductKey = "LuckBurst",
