@@ -16,6 +16,7 @@ local FormatUtil = require(Util:WaitForChild("FormatUtil"))
 local SafeWait = require(Util:WaitForChild("SafeWait"))
 local Trove = require(Util:WaitForChild("Trove"))
 local UIConfig = require(Config:WaitForChild("UIConfig"))
+local ProgressionConfig = require(Config:WaitForChild("ProgressionConfig"))
 
 local UIController = {}
 UIController.__index = UIController
@@ -158,6 +159,27 @@ local function getOrderedButtons(container)
         return a.LayoutOrder < b.LayoutOrder
     end)
     return buttons
+end
+
+local function bindGuiActivation(trove, target, callback)
+    if not target or not callback then
+        return false
+    end
+
+    if target:IsA("GuiButton") then
+        trove:Connect(target.Activated, callback)
+        return true
+    elseif target:IsA("GuiObject") then
+        target.Active = true
+        trove:Connect(target.InputBegan, function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                callback()
+            end
+        end)
+        return true
+    end
+
+    return false
 end
 
 local function isPanelVisible(panel)
@@ -466,21 +488,35 @@ function UIController:_bindActions()
         end)
     end
 
-    local rebirthButton = self._ui and SafeWait.FindPath(self._ui, UIConfig.ActionButtons.Rebirth)
-    if rebirthButton and rebirthButton:IsA("GuiButton") then
-        self._trove:Connect(rebirthButton.Activated, function()
-            local result = self:_invoke("RequestRebirth")
-            if result and not result.Success and result.Message then
-                self._notifier:Show({ Kind = "Warning", Message = result.Message })
-            end
-        end)
+    local rebirthButton = self._ui and (
+        SafeWait.FindPath(self._ui, UIConfig.ActionButtons.Rebirth, true)
+        or SafeWait.FindPath(self._ui, { "Rebirth", "Content", "Btns", "RebirthBtn" }, true)
+    )
+    if rebirthButton and not rebirthButton:IsA("GuiButton") then
+        rebirthButton = findFirstDescendantByNamesInsensitive(rebirthButton, { "RebirthBtn", "RebirthButton", "Button" }, "GuiButton") or rebirthButton
+    end
+    local rebirthBound = bindGuiActivation(self._trove, rebirthButton, function()
+        local result = self:_invoke("RequestRebirth")
+        if result and not result.Success and result.Message then
+            self._notifier:Show({ Kind = "Warning", Message = result.Message })
+        end
+    end)
+    if rebirthButton and not rebirthBound then
+        warn("[UI] Rebirth action target is missing or not interactable.")
     end
 
-    local skipRebirth = self._ui and SafeWait.FindPath(self._ui, UIConfig.ActionButtons.SkipRebirth)
-    if skipRebirth and skipRebirth:IsA("GuiButton") then
-        self._trove:Connect(skipRebirth.Activated, function()
-            self:_invoke("PromptDeveloperProductPurchase", UIConfig.RebirthSkipProductKey)
-        end)
+    local skipRebirth = self._ui and (
+        SafeWait.FindPath(self._ui, UIConfig.ActionButtons.SkipRebirth, true)
+        or SafeWait.FindPath(self._ui, { "Rebirth", "SkipRebirthBtn" }, true)
+    )
+    if skipRebirth and not skipRebirth:IsA("GuiButton") then
+        skipRebirth = findFirstDescendantByNamesInsensitive(skipRebirth, { "SkipRebirthBtn", "SkipButton", "Button" }, "GuiButton") or skipRebirth
+    end
+    local skipRebirthBound = bindGuiActivation(self._trove, skipRebirth, function()
+        self:_invoke("PromptDeveloperProductPurchase", UIConfig.RebirthSkipProductKey)
+    end)
+    if skipRebirth and not skipRebirthBound then
+        warn("[UI] Skip rebirth action target is not interactable.")
     end
 end
 
@@ -1642,9 +1678,10 @@ function UIController:_updateRebirth(snapshot)
         { "Content", "Progress", "Label02", "Main" },
         { "Content", "Label01", "Main" },
     })
-    local fill = SafeWait.FindPath(rebirthPanel, { "Content", "Progress", "Bar", "Fill" })
+    local fill = SafeWait.FindPath(rebirthPanel, { "Content", "Progress", "Bar", "Fill" }, true)
     local progressLabelModern = SafeWait.FindPath(rebirthPanel, { "BarFrame", "ShardsNeeded" }, true)
-    local fillModern = SafeWait.FindPath(rebirthPanel, { "BarFrame", "Frame" }, true)
+    local fillModern = SafeWait.FindPath(rebirthPanel, { "BarFrame", "Frame", "Fill" }, true)
+        or SafeWait.FindPath(rebirthPanel, { "BarFrame", "Frame" }, true)
     local rebirthCountLabelModern = SafeWait.FindPath(rebirthPanel, { "Youhave_Rebirths" }, true)
 
     local currentCashLabelModern = SafeWait.FindPath(rebirthPanel, { "CurrentCash", "CashAmount" }, true)
