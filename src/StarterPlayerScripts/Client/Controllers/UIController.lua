@@ -169,9 +169,7 @@ local function bindGuiActivation(trove, target, callback)
     if target:IsA("GuiButton") then
         trove:Connect(target.Activated, callback)
         return true
-    end
-
-    if target:IsA("GuiObject") then
+    elseif target:IsA("GuiObject") then
         target.Active = true
         trove:Connect(target.InputBegan, function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -497,12 +495,15 @@ function UIController:_bindActions()
     if rebirthButton and not rebirthButton:IsA("GuiButton") then
         rebirthButton = findFirstDescendantByNamesInsensitive(rebirthButton, { "RebirthBtn", "RebirthButton", "Button" }, "GuiButton") or rebirthButton
     end
-    bindGuiActivation(self._trove, rebirthButton, function()
+    local rebirthBound = bindGuiActivation(self._trove, rebirthButton, function()
         local result = self:_invoke("RequestRebirth")
         if result and not result.Success and result.Message then
             self._notifier:Show({ Kind = "Warning", Message = result.Message })
         end
     end)
+    if not rebirthBound then
+        warn("[UI] Rebirth action target is missing or not interactable.")
+    end
 
     local skipRebirth = self._ui and (
         SafeWait.FindPath(self._ui, UIConfig.ActionButtons.SkipRebirth, true)
@@ -511,9 +512,12 @@ function UIController:_bindActions()
     if skipRebirth and not skipRebirth:IsA("GuiButton") then
         skipRebirth = findFirstDescendantByNamesInsensitive(skipRebirth, { "SkipRebirthBtn", "SkipButton", "Button" }, "GuiButton") or skipRebirth
     end
-    bindGuiActivation(self._trove, skipRebirth, function()
+    local skipRebirthBound = bindGuiActivation(self._trove, skipRebirth, function()
         self:_invoke("PromptDeveloperProductPurchase", UIConfig.RebirthSkipProductKey)
     end)
+    if skipRebirth and not skipRebirthBound then
+        warn("[UI] Skip rebirth action target is not interactable.")
+    end
 end
 
 function UIController:_bindCloseButtons()
