@@ -501,7 +501,7 @@ function UIController:_bindActions()
             self._notifier:Show({ Kind = "Warning", Message = result.Message })
         end
     end)
-    if not rebirthBound then
+    if rebirthButton and not rebirthBound then
         warn("[UI] Rebirth action target is missing or not interactable.")
     end
 
